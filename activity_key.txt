@@ -1,0 +1,19 @@
+walking = A
+jogging = B
+stairs = C
+sitting = D
+standing = E
+typing = F
+brushing teeth = G
+eating soup = H
+eating chips = I
+eating pasta = J
+drinking = K
+eating sandwich = L
+kicking = M
+catch = O
+dribbling = P
+writing = Q
+clapping = R
+folding clothes = S
+

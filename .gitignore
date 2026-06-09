@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local data artifacts
+data/external/*
+!data/external/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Local model outputs
+*.pkl
+*.joblib
+
+# OS / editor noise
+.DS_Store
+Thumbs.db

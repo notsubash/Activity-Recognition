@@ -1,0 +1,7 @@
+-r requirements.txt
+
+black
+isort
+ruff
+nbqa
+pre-commit

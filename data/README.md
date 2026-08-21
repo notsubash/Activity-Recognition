@@ -38,7 +38,7 @@ python -m har.data.download
 
 If that path already exists, the script skips the ~295 MB fetch.
 
-Option C: download the zip yourself from [UCI dataset 507](https://archive.ics.uci.edu/dataset/507/wisdm+smartphone+and+smartwatch+activity+and+biometrics+dataset) and extract into `data/external/`.
+Option C: download the zip yourself from [UCI dataset 507](https://archive.ics.uci.edu/dataset/507/wisdm+smartphone+and+smartwatch+activity+and+biometrics+dataset) and extract into `data/external/`. Do not unzip into `data/external/wisdm-dataset/`; that creates an extra nested folder.
 
 The archived `DataLoader.ipynb` hardcoded `../data/external/wisdm-dataset/wisdm-dataset`. That extra nested folder is not what the UCI zip produces. If you re-run the notebook, pass `../data/external/wisdm-dataset`.
 

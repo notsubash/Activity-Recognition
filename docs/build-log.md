@@ -85,7 +85,7 @@ python -c "from pathlib import Path; from har.data.parse import load_subject_sen
 
 **Decision:** Default extract dest is `data/external`, because the UCI zip already contains a top-level `wisdm-dataset/` folder. That matches this dump: `data/external/wisdm-dataset/raw/...`. The plan and archived `DataLoader.ipynb` used `wisdm-dataset/wisdm-dataset/raw/...`; `resolve_raw_root` accepts both. `zip_sha256` stays null until someone runs a real zip download (this machine has an extract, not the zip).
 
-**Gotcha:** Extracting the UCI zip *into* `data/external/wisdm-dataset/` creates the extra nested folder. CI must not call the downloader; the tests use a tiny fixture zip only.
+**Gotcha:** Extracting the UCI zip *into* `data/external/wisdm-dataset/` creates the extra nested folder. CI must not call the downloader; the tests use a tiny fixture zip only. A failed extract (HTML 403, truncated body, zip-slip) must delete `wisdm-dataset.zip` or the next run reuses it forever while `zip_sha256` is still null.
 
 **Demo clip:**
 ```bash

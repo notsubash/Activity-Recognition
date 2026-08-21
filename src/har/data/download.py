@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 
 CHUNK_BYTES = 1024 * 1024
 ZIP_NAME = "wisdm-dataset.zip"
+URL_TIMEOUT_S = 60
 _SENTINEL = Path(RAW_SENTINEL)
 
 
@@ -61,10 +62,16 @@ def download_and_extract(dest: Path, url: str, sha256: str | None = None) -> Pat
             zip_path.unlink(missing_ok=True)
             raise ValueError(f"sha256 mismatch: expected {sha256}, got {digest}")
 
-    _safe_extract(zip_path, dest)
-    raw_root = resolve_raw_root(dest)
-    if raw_root is None:
-        raise FileNotFoundError(f"extracted zip but missing {_SENTINEL.as_posix()} under {dest}")
+    try:
+        _safe_extract(zip_path, dest)
+        raw_root = resolve_raw_root(dest)
+        if raw_root is None:
+            raise FileNotFoundError(
+                f"extracted zip but missing {_SENTINEL.as_posix()} under {dest}"
+            )
+    except BaseException:
+        zip_path.unlink(missing_ok=True)
+        raise
     log.info("extracted to %s", raw_root)
     return raw_root
 
@@ -98,7 +105,7 @@ def _open_source(url: str) -> BinaryIO:
     if path.is_file():
         return path.open("rb")
     request = urllib.request.Request(url, headers={"User-Agent": "har-wisdm-downloader/0.1"})
-    return urllib.request.urlopen(request)  # noqa: S310
+    return urllib.request.urlopen(request, timeout=URL_TIMEOUT_S)  # noqa: S310
 
 
 def _stream_to_file(source: BinaryIO, dest: Path) -> str:

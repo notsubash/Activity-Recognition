@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from har.data.download import download_and_extract
+from har.constants import RAW_SENTINEL, UCI_ZIP_URL
+from har.data.download import ZIP_NAME, download_and_extract
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -77,6 +78,44 @@ def test_rejects_wrong_sha256(tmp_path: Path):
     _zip_tree(src, FIXTURE_TXT.parents[3], "wisdm-dataset/")
     with pytest.raises(ValueError, match="sha256"):
         download_and_extract(dest, url=str(src), sha256="0" * 64)
+    assert not (dest / "wisdm-dataset").exists()
+    assert not (dest / ZIP_NAME).exists()
+
+
+def test_corrupt_zip_is_unlinked_so_retry_fetches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    dest = tmp_path / "external"
+    dest.mkdir()
+    (dest / ZIP_NAME).write_bytes(b"not a zip")
+    with pytest.raises(zipfile.BadZipFile):
+        download_and_extract(dest, url="http://example.invalid/wisdm.zip")
+    assert not (dest / ZIP_NAME).exists()
+
+    fetched = {"n": 0}
+
+    def boom(*_args, **_kwargs):
+        fetched["n"] += 1
+        raise AssertionError("fetched")
+
+    monkeypatch.setattr("har.data.download._open_source", boom)
+    with pytest.raises(AssertionError, match="fetched"):
+        download_and_extract(dest, url="http://example.invalid/wisdm.zip")
+    assert fetched["n"] == 1
+
+
+def test_rejects_zip_slip(tmp_path: Path):
+    src = tmp_path / "src.zip"
+    dest = tmp_path / "external"
+    dest.mkdir()
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("wisdm-dataset/" + SENTINEL.as_posix(), "ok\n")
+        zf.writestr("../outside.txt", "pwned\n")
+    with pytest.raises(ValueError, match="unsafe"):
+        download_and_extract(dest, url=str(src), sha256=None)
+    assert not (tmp_path / "outside.txt").exists()
+    assert not (dest / "wisdm-dataset").exists()
+    assert not (dest / ZIP_NAME).exists()
 
 
 def test_nested_zip_layout_resolves_raw_root(tmp_path: Path):
@@ -93,6 +132,8 @@ def test_audit_yaml_documents_tree_and_checksum_field():
     cfg = yaml.safe_load((REPO_ROOT / "configs" / "audit.yaml").read_text(encoding="utf-8"))
     data = cfg["data"]
     assert data["raw_root"] == "data/external/wisdm-dataset"
-    assert data["zip_url"].startswith("https://archive.ics.uci.edu/")
+    assert data["zip_url"] == UCI_ZIP_URL
+    assert data["expected_sentinel"] == RAW_SENTINEL
+    assert data["zip_filename"] == ZIP_NAME
     assert "zip_sha256" in data
     assert "raw/phone/accel/data_1600_accel_phone.txt" in data["expected_tree"]

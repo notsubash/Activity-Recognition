@@ -71,7 +71,7 @@ python -c "from pathlib import Path; from har.data.parse import load_subject_sen
 
 ## Task 2: Download script and data README
 
-**Commit:** (same commit as this section)
+**Commit:** `d73675a`
 
 **Story beat:** Reproducibility is a script plus a checksum field, not a zip in git. If the sentinel file is already on disk, the downloader does nothing.
 

@@ -24,9 +24,13 @@ The pipeline includes:
 │  └─ reports/
 │     └─ evaluation.txt
 ├─ notebooks/
-│  ├─ DataLoader.ipynb
-│  ├─ analysis.ipynb
-│  └─ PhoneXGB2.ipynb
+│  └─ archive/             # student notebooks
+│     ├─ DataLoader.ipynb
+│     ├─ analysis.ipynb
+│     └─ PhoneXGB2.ipynb
+├─ src/
+│  └─ har/                 # installable package
+├─ tests/
 ├─ .editorconfig
 ├─ .gitignore
 ├─ pyproject.toml
@@ -44,7 +48,7 @@ The pipeline includes:
 - scikit-learn
 - xgboost
 - matplotlib, seaborn
-- tensorflow/keras
+- FastAPI, ONNX Runtime, MLflow (package runtime; not used by archived notebooks)
 
 ## Setup
 
@@ -55,7 +59,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-For development tooling (format/lint):
+For development tooling (pytest, ruff, pre-commit):
 
 ```bash
 python -m pip install -r requirements-dev.txt
@@ -64,19 +68,19 @@ python -m pip install -r requirements-dev.txt
 ## Data Layout and Paths
 
 1. Put original WISDM files under `data/external/`.
-2. Run `notebooks/DataLoader.ipynb` to generate:
+2. Run `notebooks/archive/DataLoader.ipynb` to generate:
    - `data/processed/raw.csv`
    - `data/processed/arff.csv`
-3. `notebooks/analysis.ipynb` reads from `data/processed/arff.csv`.
-4. `notebooks/PhoneXGB2.ipynb` reads from `data/processed/raw.csv`.
+3. `notebooks/archive/analysis.ipynb` reads from `data/processed/arff.csv`.
+4. `notebooks/archive/PhoneXGB2.ipynb` reads from `data/processed/raw.csv`.
 
 > Notebooks were updated to use relative paths for local reproducibility.
 
 ## Notebook Workflow
 
-1. Run `notebooks/DataLoader.ipynb`.
-2. Run `notebooks/analysis.ipynb`.
-3. Run `notebooks/PhoneXGB2.ipynb`.
+1. Run `notebooks/archive/DataLoader.ipynb`.
+2. Run `notebooks/archive/analysis.ipynb`.
+3. Run `notebooks/archive/PhoneXGB2.ipynb`.
 
 ## Formatting and Quality
 

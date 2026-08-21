@@ -20,10 +20,22 @@ data/external/*
 !data/external/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+data/audit/*
+!data/audit/.gitkeep
+
+# Experiment tracking
+mlruns/
 
 # Local model outputs
 *.pkl
 *.joblib
+*.onnx
+onnx/
+
+# Packaging
+*.egg-info/
+dist/
+build/
 
 # OS / editor noise
 .DS_Store

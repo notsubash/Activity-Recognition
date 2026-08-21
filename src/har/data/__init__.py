@@ -1,1 +1,1 @@
-"""Download and parse raw WISDM files."""
+"""Download, parse, audit, and repair raw WISDM files."""

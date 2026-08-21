@@ -1,0 +1,13 @@
+# Ablation: rWISDM-style phone-accel reorient (shift, do not negate).
+# Other repair flags match configs/default.yaml.
+
+seed: 42
+data:
+  raw_root: data/external/wisdm-dataset
+  audit_dir: data/audit
+  processed_dir: data/processed
+repair:
+  target_hz: 20.0
+  reorient: true
+  trim_start_s: 0.0
+  align_accel_gyro: true

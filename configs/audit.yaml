@@ -10,6 +10,8 @@
 data:
   dest: data/external
   raw_root: data/external/wisdm-dataset
+  audit_dir: data/audit
+  data_card: docs/data_card.md
   zip_url: https://archive.ics.uci.edu/static/public/507/wisdm+smartphone+and+smartwatch+activity+and+biometrics+dataset.zip
   zip_sha256: null
   zip_filename: wisdm-dataset.zip

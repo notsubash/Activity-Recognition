@@ -75,6 +75,7 @@ data/external/wisdm-dataset/raw/phone/accel/data_1600_accel_phone.txt
 
 ```bash
 python -m har.data.download   # skips if that file already exists; not used in CI
+python -m har.data.audit      # writes gitignored CSVs under data/audit/ and docs/data_card.md
 ```
 
 Zip URL and checksum field live in `configs/audit.yaml`. See `data/README.md`.

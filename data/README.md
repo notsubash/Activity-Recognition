@@ -47,4 +47,13 @@ The archived `DataLoader.ipynb` hardcoded `../data/external/wisdm-dataset/wisdm-
 - `activity_key.txt` (repo root `data/`): label legend, tracked.
 - `external/`: original WISDM dump, gitignored.
 - `processed/`: generated arrays and CSVs, gitignored.
-- `audit/`: generated coverage tables, gitignored (Task 3).
+- `audit/`: generated coverage tables, gitignored (keep `.gitkeep`). Summary lives in `docs/data_card.md`.
+
+## Audit
+
+```bash
+python -m har.data.audit
+# or: python scripts/audit.py
+```
+
+Writes `data/audit/sessions.csv`, `coverage.csv`, `missing_cells.csv`, `hz_by_session.csv` (gitignored) and regenerates `docs/data_card.md`. Does not download data. CI must not run this on the full dump.

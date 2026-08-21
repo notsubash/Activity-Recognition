@@ -95,3 +95,37 @@ python -m har.data.download
 # already extracted: .../data/external/wisdm-dataset
 # .../data/external/wisdm-dataset
 ```
+
+---
+
+## Task 3: Audit (research deliverable)
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** This dump matches Weiss row counts exactly (15,630,426). The student notebook's extra 18,827 rows are not in the raw files. Sampling is mixed 20/25/50/100 Hz, so a 200-row window is not 10 seconds.
+
+**Shipped:**
+- `src/har/data/audit.py`: `audit_session`, `audit_dataset`, coverage grid, missing cells, Weiss totals, `write_data_card`
+- `scripts/audit.py` and `python -m har.data.audit`
+- `tests/test_audit.py` (synthetic 20 vs 50 Hz, 1609-like missing B, Weiss warning, data card)
+- `docs/data_card.md` from the real dump
+- `data/audit/.gitkeep` (CSVs gitignored)
+- `configs/audit.yaml` `audit_dir` / `data_card`
+
+**Decision:** Coverage is the full 51 x 18 x 4 grid with zeros; `missing_cells.csv` is `n_samples == 0`. Implied Hz is `1e9 / median_dt_ns`, NaN if fewer than 2 samples. CSVs stay gitignored (`sessions.csv` is 725 KB); the data card is the tracked summary. Hz modes are 20, 25, 50, and 100, not a 15-25 bin that would hide 25 Hz.
+
+**Gotcha:**
+- Official claim is 20 Hz. This dump: 2,838 sessions at 20 Hz, 543 at 25 Hz, 322 at 50 Hz (18 of those round to 51), 14 at 100 Hz. Windowing by row count mixes 10 s and 4 s of real time.
+- rWISDM phone-accel gaps (1609 B, 1616 B/F, 1642 C/F) are real. The 18-class grid also lacks 1607 J, 1618 O, 1643 I on phone accel, plus more gyro/watch cells (35 missing cells total).
+- 3,717 session runs vs 3,637 occupied cells: 80 extra runs from gap > 2 s or time reversal inside an activity.
+- Zero non-monotonic timestamps and zero NaNs in this dump. Weiss totals matched, so no warning. The student 15,649,253 figure is a loader/concat artifact, not this extract.
+- Empty or nested-wrong `--raw-root` used to overwrite `docs/data_card.md` with a 3672-row empty grid and exit 0. CLI now uses `resolve_raw_root` and `audit_dataset` raises if no txt files match.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_audit.py -q
+# 12 passed
+python -m har.data.audit
+# wrote .../docs/data_card.md
+```
+The data card answers: 35 missing cells (phone accel: 1607 J, 1609 B, 1616 B,F, 1618 O, 1642 C,F, 1643 I) and Hz modes 20 / 25 / 50 / 100.

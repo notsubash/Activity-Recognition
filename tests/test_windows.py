@@ -140,9 +140,7 @@ def test_min_coverage_drops_nan_heavy_windows():
 
 def test_stack_windows_returns_x_y_groups():
     walking = make_windows(_session(duration_s=10.0, activity="A"), 5.0, 1.0, 0.95)
-    jogging = make_windows(
-        _session(duration_s=10.0, activity="B", subject_id=1601), 5.0, 1.0, 0.95
-    )
+    jogging = make_windows(_session(duration_s=10.0, activity="B", subject_id=1601), 5.0, 1.0, 0.95)
     X, y, groups = stack_windows(walking + jogging)
     n_length = int(round(5.0 * TARGET_HZ))
     assert X.shape == (12, n_length, 6)

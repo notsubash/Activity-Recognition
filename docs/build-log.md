@@ -185,5 +185,32 @@ python -m har.data.repair
 **Demo clip:**
 ```bash
 python -m pytest tests/test_windows.py -q
-# 7 passed
+# 13 passed
+```
+
+---
+
+## Task 6: Statistical features
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The student XGBoost ate 80 flattened samples. The official ARFF already had bins, MAD, correlations, and a resultant. We ship that statistical family (without MFCC) plus a raw flatten so Protocol B can compare representations on the same windows.
+
+**Shipped:**
+- `src/har/features/statistical.py`: `extract_statistical`, `flatten_raw`, `feature_names`
+- `tests/test_features.py`
+
+**Decision:** Per channel: mean, std, MAD as mean-abs-dev from the mean (WISDM "average absolute difference"), min, max, range, then 10 equal-width histogram fractions over that channel's min-max. Accel trio (first 3 channels): mean resultant magnitude and pairwise Pearson corr (xy, xz, yz). Same block for gyro when `C==6`. Constant channels put all histogram mass in bin 0 and corr is 0. Skip peak-interval and MFCC; `spectral.py` waits until Protocol B still confuses eating. `flatten_raw` is C-order `(T*C,)`. Six-channel vector is 104 floats (16 per channel, plus 4 accel, plus 4 gyro).
+
+**Gotcha:**
+- `np.histogram(..., density=True)` is a PDF, not bin fractions. Count then divide by the count sum.
+- A zero-range channel cannot be binned; special-case it or the 10 bins become noise.
+- Corrcoef on a constant axis is NaN. Fill with 0 so trees do not eat NaNs.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_features.py -q
+# 9 passed
+PYTHONPATH=src python -c "import numpy as np; from har.features.statistical import extract_statistical, flatten_raw, feature_names; x=np.ones((100,6)); print(extract_statistical(x).shape, flatten_raw(x).shape, len(feature_names(6)))"
+# (104,) (600,) 104
 ```

@@ -67,14 +67,25 @@ python -m pip install -r requirements-dev.txt
 
 ## Data Layout and Paths
 
-1. Put original WISDM files under `data/external/`.
-2. Run `notebooks/archive/DataLoader.ipynb` to generate:
-   - `data/processed/raw.csv`
-   - `data/processed/arff.csv`
-3. `notebooks/archive/analysis.ipynb` reads from `data/processed/arff.csv`.
-4. `notebooks/archive/PhoneXGB2.ipynb` reads from `data/processed/raw.csv`.
+Raw WISDM files are gitignored. Expected tree after download or a manual extract:
 
-> Notebooks were updated to use relative paths for local reproducibility.
+```text
+data/external/wisdm-dataset/raw/phone/accel/data_1600_accel_phone.txt
+```
+
+```bash
+python -m har.data.download   # skips if that file already exists; not used in CI
+```
+
+Zip URL and checksum field live in `configs/audit.yaml`. See `data/README.md`.
+
+Archived notebooks still expect a processed CSV:
+
+1. `notebooks/archive/DataLoader.ipynb` writes `data/processed/raw.csv` and `arff.csv`.
+2. `notebooks/archive/analysis.ipynb` reads `data/processed/arff.csv`.
+3. `notebooks/archive/PhoneXGB2.ipynb` reads `data/processed/raw.csv`.
+
+The archive loader hardcoded `../data/external/wisdm-dataset/wisdm-dataset`. The UCI zip extracts one level shallower (`data/external/wisdm-dataset`).
 
 ## Notebook Workflow
 

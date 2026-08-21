@@ -60,3 +60,8 @@ UCI_PAGE = (
     "https://archive.ics.uci.edu/dataset/507/"
     "wisdm+smartphone+and+smartwatch+activity+and+biometrics+dataset"
 )
+UCI_ZIP_URL = (
+    "https://archive.ics.uci.edu/static/public/507/"
+    "wisdm+smartphone+and+smartwatch+activity+and+biometrics+dataset.zip"
+)
+RAW_SENTINEL = "raw/phone/accel/data_1600_accel_phone.txt"

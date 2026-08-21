@@ -1,1 +1,1 @@
-"""Parse raw WISDM txt files into session runs."""
+"""Download and parse raw WISDM files."""

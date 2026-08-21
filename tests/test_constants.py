@@ -1,6 +1,13 @@
 from pathlib import Path
 
-from har.constants import ACTIVITY_CODES, CODE_TO_NAME, GROUP_OF, LABEL_ORDER, TARGET_HZ
+from har.constants import (
+    ACTIVITY_CODES,
+    CHANNEL_NAMES,
+    CODE_TO_NAME,
+    GROUP_OF,
+    LABEL_ORDER,
+    TARGET_HZ,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACTIVITY_KEY = REPO_ROOT / "data" / "activity_key.txt"
@@ -41,3 +48,7 @@ def test_code_to_name_matches_activity_key_file():
 
 def test_target_hz_is_20():
     assert TARGET_HZ == 20.0
+
+
+def test_channel_names_are_accel_then_gyro():
+    assert CHANNEL_NAMES == ("ax", "ay", "az", "gx", "gy", "gz")

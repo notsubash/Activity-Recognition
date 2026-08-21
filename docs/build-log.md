@@ -161,3 +161,56 @@ python -m pytest tests/test_repair.py -q
 python -m har.data.repair
 # or: python scripts/prepare.py --config configs/repair_reorient.yaml
 ```
+
+---
+
+## Task 5: Session-safe windowing
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The archived loader slid 80-sample windows over a concatenated table, so one window could mix subjects or activities. `make_windows` only slides inside one `AlignedSession`. A mixed `subject_id` or activity table cannot become a session.
+
+**Shipped:**
+- `src/har/data/windows.py`: `make_windows`, `stack_windows`, `aligned_session_from_dataframe`
+- `tests/test_windows.py`
+
+**Decision:** Window length and hop are sample counts from `round(seconds * session.hz)`, so 5 s / 1 s at 20 Hz is 100 samples with hop 20. A 10 s session is 200 samples and yields `1 + floor((10-5)/1) = 6` windows. Coverage is the fraction of timesteps where every channel is finite; windows below `min_coverage` are dropped (callers pass 0.95 from `configs/default.yaml`; it is not a `make_windows` default). `y` is the index of `activity` in `LABEL_ORDER`. `stack_windows` returns `X (N,T,C)`, `y (N,)`, `groups (N,)` subject IDs. `aligned_session_from_dataframe` is the trust boundary for anyone still holding a concatenated table: unique `subject_id`, `activity`, `device`, and `hz`, or raise.
+
+**Gotcha:**
+- Do not concatenate two activities and call `make_windows` on the concat. Window each session, then `stack_windows`.
+- `AlignedSession` already stores one subject and one activity as scalars. The mixed-identity test is on the dataframe constructor, which is how the student concat table would enter this path. That constructor also rejects mixed `device` and mixed `hz`.
+- A session shorter than `length_s` returns `[]`, not a padded window.
+- This assumes repaired `session.hz`. Row-count windows on unrepaired 50 Hz data are still the wrong number of seconds.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_windows.py -q
+# 13 passed
+```
+
+---
+
+## Task 6: Statistical features
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The student XGBoost ate 80 flattened samples. The official ARFF already had bins, MAD, correlations, and a resultant. We ship that statistical family (without MFCC) plus a raw flatten so Protocol B can compare representations on the same windows.
+
+**Shipped:**
+- `src/har/features/statistical.py`: `extract_statistical`, `flatten_raw`, `feature_names`
+- `tests/test_features.py`
+
+**Decision:** Per channel: mean, std, MAD as mean-abs-dev from the mean (WISDM "average absolute difference"), min, max, range, then 10 equal-width histogram fractions over that channel's min-max. Accel trio (first 3 channels): mean resultant magnitude and pairwise Pearson corr (xy, xz, yz). Same block for gyro when `C==6`. Constant channels put all histogram mass in bin 0 and corr is 0. Skip peak-interval and MFCC; `spectral.py` waits until Protocol B still confuses eating. `flatten_raw` is C-order `(T*C,)`. Six-channel vector is 104 floats (16 per channel, plus 4 accel, plus 4 gyro).
+
+**Gotcha:**
+- `np.histogram(..., density=True)` is a PDF, not bin fractions. Count then divide by the count sum.
+- A zero-range channel cannot be binned; special-case it or the 10 bins become noise.
+- Corrcoef on a constant axis is NaN. Fill with 0 so trees do not eat NaNs.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_features.py -q
+# 9 passed
+PYTHONPATH=src python -c "import numpy as np; from har.features.statistical import extract_statistical, flatten_raw, feature_names; x=np.ones((100,6)); print(extract_statistical(x).shape, flatten_raw(x).shape, len(feature_names(6)))"
+# (104,) (600,) 104
+```

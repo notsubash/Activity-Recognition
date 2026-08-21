@@ -82,9 +82,7 @@ def test_rejects_wrong_sha256(tmp_path: Path):
     assert not (dest / ZIP_NAME).exists()
 
 
-def test_corrupt_zip_is_unlinked_so_retry_fetches(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_corrupt_zip_is_unlinked_so_retry_fetches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     dest = tmp_path / "external"
     dest.mkdir()
     (dest / ZIP_NAME).write_bytes(b"not a zip")

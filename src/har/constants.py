@@ -51,6 +51,7 @@ GROUP_OF = MappingProxyType(
     }
 )
 
+CHANNEL_NAMES = ("ax", "ay", "az", "gx", "gy", "gz")
 TARGET_HZ = 20.0
 DEFAULT_WINDOW_S = 5.0
 DEFAULT_HOP_S = 1.0

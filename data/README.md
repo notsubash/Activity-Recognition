@@ -46,7 +46,7 @@ The archived `DataLoader.ipynb` hardcoded `../data/external/wisdm-dataset/wisdm-
 
 - `activity_key.txt` (repo root `data/`): label legend, tracked.
 - `external/`: original WISDM dump, gitignored.
-- `processed/`: generated arrays and CSVs, gitignored.
+- `processed/`: repaired parquet sessions and `manifest.jsonl`, gitignored (keep `.gitkeep`). Archived notebooks still write `raw.csv` / `arff.csv` here.
 - `audit/`: generated coverage tables, gitignored (keep `.gitkeep`). Summary lives in `docs/data_card.md`.
 
 ## Audit
@@ -57,3 +57,14 @@ python -m har.data.audit
 ```
 
 Writes `data/audit/sessions.csv`, `coverage.csv`, `missing_cells.csv`, `hz_by_session.csv` (gitignored) and regenerates `docs/data_card.md`. Does not download data. CI must not run this on the full dump.
+
+## Repair
+
+```bash
+python -m har.data.repair
+# or: python scripts/prepare.py
+```
+
+Resamples each session to 20 Hz by interpolating onto a shared time grid (not every k-th row), aligns accel and gyro by coverage intersection (not an exact-timestamp inner join), optionally reorients phone accel, then trims the start. Default config is `configs/default.yaml` (`reorient: false`). Ablation: `configs/repair_reorient.yaml`.
+
+Writes one parquet per aligned session under `data/processed/{device}/` plus `data/processed/manifest.jsonl` (input path, n_in, n_out, hz_in, hz_out, reorient, trim). Re-running replaces parquet, `phone/`/`watch/` dirs, and `manifest.jsonl`; it leaves other files such as archived-notebook `raw.csv`. CI must not run this on the full dump.

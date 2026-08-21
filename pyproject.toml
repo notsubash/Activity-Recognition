@@ -12,6 +12,7 @@ license = { text = "MIT" }
 dependencies = [
     "pandas==2.2.3",
     "numpy==2.2.6",
+    "pyarrow==23.0.1",
     "scipy==1.15.3",
     "scikit-learn==1.7.2",
     "xgboost==2.1.4",

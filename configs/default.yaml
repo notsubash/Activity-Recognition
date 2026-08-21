@@ -1,0 +1,24 @@
+seed: 42
+data:
+  raw_root: data/external/wisdm-dataset
+  audit_dir: data/audit
+  processed_dir: data/processed
+repair:
+  target_hz: 20.0
+  reorient: false
+  trim_start_s: 0.0
+  align_accel_gyro: true  # false is rejected until an unrepaired path exists
+window:
+  length_s: 5.0
+  hop_s: 1.0
+  min_coverage: 0.95
+features:
+  kind: statistical   # statistical | raw_flat | both
+model:
+  name: xgboost
+split:
+  protocol: groupkfold  # leaky | groupkfold | loso | hardware_transfer
+  n_splits: 5
+  leaky_test_size: 0.2
+tracking:
+  experiment: wisdm-har

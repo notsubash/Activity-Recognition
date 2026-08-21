@@ -4,7 +4,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from har.data.parse import load_subject_sensor_file, parse_raw_line, split_activity_runs
+from har.data.parse import (
+    load_subject_sensor_file,
+    parse_raw_file,
+    parse_raw_line,
+    split_activity_runs,
+)
 from har.types import SessionKey
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "sample_raw.txt"
@@ -29,6 +34,13 @@ def test_parse_raw_line_rejects_wrong_arity():
         parse_raw_line("1600,A,1,0.1,0.2,0.3,9;")
 
 
+def test_parse_raw_file_includes_path_and_line_on_error(tmp_path: Path):
+    path = tmp_path / "bad.txt"
+    path.write_text("1600,A,1,0.1,0.2\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"bad.txt:1:"):
+        parse_raw_file(path)
+
+
 def test_consecutive_same_activity_stays_together_then_b_starts_another():
     frames = load_subject_sensor_file(FIXTURE, "phone", "accel")
     assert len(frames) == 2
@@ -47,6 +59,11 @@ def test_consecutive_same_activity_stays_together_then_b_starts_another():
     assert first.xyz.shape == (2, 3)
     assert first.xyz.dtype == np.float32
     assert second.xyz.shape == (1, 3)
+    np.testing.assert_allclose(
+        first.xyz[0],
+        np.array([-0.36476135, 8.793503, 1.0550842], dtype=np.float32),
+        rtol=1e-6,
+    )
 
 
 def _run_df(timestamps, activity="A"):

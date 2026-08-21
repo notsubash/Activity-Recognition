@@ -84,16 +84,12 @@ python -m pip install -r requirements-dev.txt
 
 ## Formatting and Quality
 
-This repo includes production-style formatting config:
-- `.editorconfig` for whitespace/newline consistency
-- `pyproject.toml` for `black`, `isort`, and `ruff` configuration
-
-Run formatting checks:
+- `.editorconfig` for whitespace and newlines
+- `ruff` via `pyproject.toml` (line length 100). Dev extras are pytest, ruff, and pre-commit.
 
 ```bash
-python -m nbqa black notebooks
-python -m nbqa isort notebooks
-python -m nbqa ruff notebooks
+python -m ruff check src tests
+python -m ruff format --check src tests
 ```
 
 ## Baseline Result

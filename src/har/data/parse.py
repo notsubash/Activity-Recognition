@@ -7,7 +7,14 @@ import pandas as pd
 
 from har.types import Device, Sensor, SessionFrame, SessionKey
 
-RAW_COLUMNS = ("subject_id", "activity", "timestamp", "x", "y", "z")
+RAW_COLUMNS: tuple[str, ...] = (
+    "subject_id",
+    "activity",
+    "timestamp",
+    "x",
+    "y",
+    "z",
+)
 MAX_GAP_S = 2.0
 _MAX_GAP_NS = int(MAX_GAP_S * 1_000_000_000)
 
@@ -24,13 +31,28 @@ def parse_raw_line(line: str) -> tuple[int, str, int, float, float, float]:
 
 def parse_raw_file(path: Path) -> pd.DataFrame:
     """Load one subject-sensor txt file as a DataFrame (all activities concatenated)."""
-    rows = []
+    rows: list[tuple[int, str, int, float, float, float]] = []
     with path.open(encoding="utf-8") as handle:
-        for line in handle:
+        for lineno, line in enumerate(handle, 1):
             if not line.strip():
                 continue
-            rows.append(parse_raw_line(line))
-    return pd.DataFrame(rows, columns=list(RAW_COLUMNS))
+            try:
+                rows.append(parse_raw_line(line))
+            except ValueError as exc:
+                raise ValueError(f"{path}:{lineno}: {exc}") from exc
+    if not rows:
+        return pd.DataFrame({name: pd.Series(dtype=object) for name in RAW_COLUMNS})
+    subject_id, activity, timestamp, x, y, z = zip(*rows, strict=True)
+    return pd.DataFrame(
+        {
+            "subject_id": subject_id,
+            "activity": activity,
+            "timestamp": timestamp,
+            "x": x,
+            "y": y,
+            "z": z,
+        }
+    )
 
 
 def split_activity_runs(df: pd.DataFrame) -> list[SessionFrame]:

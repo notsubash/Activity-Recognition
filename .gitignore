@@ -40,3 +40,5 @@ build/
 # OS / editor noise
 .DS_Store
 Thumbs.db
+docs/build-log.md
+docs/PLAN.md

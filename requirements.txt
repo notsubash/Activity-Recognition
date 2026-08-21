@@ -1,10 +1,2 @@
-pandas
-numpy
-scipy
-scikit-learn
-xgboost
-matplotlib
-seaborn
-jupyter
-notebook
-tensorflow
+# Runtime dependencies are pinned in pyproject.toml [project.dependencies].
+-e .

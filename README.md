@@ -24,9 +24,13 @@ The pipeline includes:
 │  └─ reports/
 │     └─ evaluation.txt
 ├─ notebooks/
-│  ├─ DataLoader.ipynb
-│  ├─ analysis.ipynb
-│  └─ PhoneXGB2.ipynb
+│  └─ archive/             # student notebooks
+│     ├─ DataLoader.ipynb
+│     ├─ analysis.ipynb
+│     └─ PhoneXGB2.ipynb
+├─ src/
+│  └─ har/                 # installable package
+├─ tests/
 ├─ .editorconfig
 ├─ .gitignore
 ├─ pyproject.toml
@@ -44,7 +48,7 @@ The pipeline includes:
 - scikit-learn
 - xgboost
 - matplotlib, seaborn
-- tensorflow/keras
+- FastAPI, ONNX Runtime, MLflow (package runtime; not used by archived notebooks)
 
 ## Setup
 
@@ -55,7 +59,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-For development tooling (format/lint):
+For development tooling (pytest, ruff, pre-commit):
 
 ```bash
 python -m pip install -r requirements-dev.txt
@@ -63,33 +67,40 @@ python -m pip install -r requirements-dev.txt
 
 ## Data Layout and Paths
 
-1. Put original WISDM files under `data/external/`.
-2. Run `notebooks/DataLoader.ipynb` to generate:
-   - `data/processed/raw.csv`
-   - `data/processed/arff.csv`
-3. `notebooks/analysis.ipynb` reads from `data/processed/arff.csv`.
-4. `notebooks/PhoneXGB2.ipynb` reads from `data/processed/raw.csv`.
+Raw WISDM files are gitignored. Expected tree after download or a manual extract:
 
-> Notebooks were updated to use relative paths for local reproducibility.
+```text
+data/external/wisdm-dataset/raw/phone/accel/data_1600_accel_phone.txt
+```
+
+```bash
+python -m har.data.download   # skips if that file already exists; not used in CI
+```
+
+Zip URL and checksum field live in `configs/audit.yaml`. See `data/README.md`.
+
+Archived notebooks still expect a processed CSV:
+
+1. `notebooks/archive/DataLoader.ipynb` writes `data/processed/raw.csv` and `arff.csv`.
+2. `notebooks/archive/analysis.ipynb` reads `data/processed/arff.csv`.
+3. `notebooks/archive/PhoneXGB2.ipynb` reads `data/processed/raw.csv`.
+
+The archive loader hardcoded `../data/external/wisdm-dataset/wisdm-dataset`. The UCI zip extracts one level shallower (`data/external/wisdm-dataset`).
 
 ## Notebook Workflow
 
-1. Run `notebooks/DataLoader.ipynb`.
-2. Run `notebooks/analysis.ipynb`.
-3. Run `notebooks/PhoneXGB2.ipynb`.
+1. Run `notebooks/archive/DataLoader.ipynb`.
+2. Run `notebooks/archive/analysis.ipynb`.
+3. Run `notebooks/archive/PhoneXGB2.ipynb`.
 
 ## Formatting and Quality
 
-This repo includes production-style formatting config:
-- `.editorconfig` for whitespace/newline consistency
-- `pyproject.toml` for `black`, `isort`, and `ruff` configuration
-
-Run formatting checks:
+- `.editorconfig` for whitespace and newlines
+- `ruff` via `pyproject.toml` (line length 100). Dev extras are pytest, ruff, and pre-commit.
 
 ```bash
-python -m nbqa black notebooks
-python -m nbqa isort notebooks
-python -m nbqa ruff notebooks
+python -m ruff check src tests
+python -m ruff format --check src tests
 ```
 
 ## Baseline Result

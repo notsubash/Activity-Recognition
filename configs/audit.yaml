@@ -1,0 +1,27 @@
+# Pin for the WISDM UCI 507 dump. CI must not download this zip (~295 MB).
+#
+# Official zip extracts to data/external/wisdm-dataset/raw/...
+# The archived DataLoader notebook hardcoded a nested extra wisdm-dataset/
+# directory; pass data/external/wisdm-dataset if you re-run it.
+#
+# zip_sha256 is filled after the first real download (sha256 is printed).
+# Leave null when using a manual extract that already matches expected_tree.
+
+data:
+  dest: data/external
+  raw_root: data/external/wisdm-dataset
+  zip_url: https://archive.ics.uci.edu/static/public/507/wisdm+smartphone+and+smartwatch+activity+and+biometrics+dataset.zip
+  zip_sha256: null
+  zip_filename: wisdm-dataset.zip
+  expected_sentinel: raw/phone/accel/data_1600_accel_phone.txt
+  expected_tree: |
+    data/external/wisdm-dataset/
+      README.txt
+      WISDM-dataset-description.pdf
+      activity_key.txt
+      raw/phone/accel/data_1600_accel_phone.txt
+      raw/phone/gyro/
+      raw/watch/accel/
+      raw/watch/gyro/
+      arff_files/
+      arffmagic-master/

@@ -1,7 +1,2 @@
--r requirements.txt
-
-black
-isort
-ruff
-nbqa
-pre-commit
+# Dev extras are pinned in pyproject.toml [project.optional-dependencies] dev.
+-e ".[dev]"

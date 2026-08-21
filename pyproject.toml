@@ -39,6 +39,11 @@ include = ["har*"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]
+pythonVersion = "3.10"
+
 [tool.black]
 line-length = 100
 target-version = ["py310"]

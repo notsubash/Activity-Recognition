@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from har.constants import DEFAULT_TRIM_START_S, TARGET_HZ
+from har.constants import CHANNEL_NAMES, DEFAULT_TRIM_START_S, TARGET_HZ
 from har.data.audit import iter_raw_sensor_files
 from har.data.download import resolve_raw_root
 from har.data.parse import load_subject_sensor_file
@@ -22,7 +22,6 @@ from har.types import AlignedSession, SessionFrame
 log = logging.getLogger(__name__)
 
 NS_PER_S = 1_000_000_000
-CHANNEL_NAMES = ("ax", "ay", "az", "gx", "gy", "gz")
 
 
 def resample_session(frame: SessionFrame, target_hz: float) -> SessionFrame:

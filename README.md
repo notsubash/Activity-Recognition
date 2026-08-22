@@ -78,6 +78,8 @@ python -m har.data.download   # skips if that file already exists; not used in C
 python -m har.data.audit      # writes gitignored CSVs under data/audit/ and docs/data_card.md
 python -m har.data.repair     # resample/align to 20 Hz; writes gitignored parquet under data/processed/
 python -m har.train --config configs/protocol_a_leaky.yaml  # A2 leaky XGBoost; overnight on full WISDM, not CI
+
+python -m mlflow ui --backend-store-uri mlruns # Run Mlflow
 ```
 
 Zip URL and checksum field live in `configs/audit.yaml`. See `data/README.md`.

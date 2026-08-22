@@ -9,6 +9,7 @@ import subprocess
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
+import mlflow
 
 import numpy as np
 import pandas as pd
@@ -40,8 +41,10 @@ def run_experiment(config_path: Path) -> Path:
     )
     if not sessions:
         raise FileNotFoundError(f"no aligned sessions under {processed_dir}")
+    log.info("loaded %d sessions from %s", len(sessions), processed_dir)
 
     window_cfg = _section(cfg, "window")
+    log.info("windowing %d sessions", len(sessions))
     windows = []
     for session in sessions:
         length_s, hop_s = _window_seconds(session, window_cfg)
@@ -56,13 +59,17 @@ def run_experiment(config_path: Path) -> Path:
     X, y, groups = stack_windows(windows)
     if X.shape[0] == 0:
         raise ValueError("no windows produced")
+    log.info("stacked %d windows shape=%s", X.shape[0], tuple(int(d) for d in X.shape))
     feature_kind = str(_section(cfg, "features").get("kind") or "statistical")
+    log.info("featurizing kind=%s", feature_kind)
     X_feat = _featurize(X, feature_kind)
+    log.info("features shape=%s", tuple(int(d) for d in X_feat.shape))
 
     split_cfg = _section(cfg, "split")
     protocol = str(split_cfg.get("protocol") or "leaky")
     seed = int(cfg.get("seed", 42))
     splits = list(_iter_splits(X_feat, y, groups, split_cfg, seed))
+    log.info("split protocol=%s folds=%d", protocol, len(splits))
 
     tracking = _section(cfg, "tracking")
     output_dir = _resolve_path(tracking.get("output_dir") or "docs/reports", repo)
@@ -70,8 +77,7 @@ def run_experiment(config_path: Path) -> Path:
     protocol_name = str(tracking.get("protocol_name") or protocol)
     model_cfg = _section(cfg, "model")
     tracking_uri = _tracking_uri(tracking.get("tracking_uri"), repo)
-
-    import mlflow
+    out = output_dir / f"{config_path.stem}.json"
 
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(str(tracking.get("experiment") or "wisdm-har"))
@@ -90,15 +96,30 @@ def run_experiment(config_path: Path) -> Path:
         mlflow.log_param("model", str(model_cfg.get("name") or "xgboost"))
         mlflow.log_param("features", feature_kind)
         mlflow.log_dict(_jsonable(cfg), "config.json")
+        log.info(
+            "mlflow run_id=%s experiment=%s",
+            run.info.run_id,
+            tracking.get("experiment") or "wisdm-har",
+        )
 
-        for split in splits:
+        n_folds = len(splits)
+        for fold_i, split in enumerate(splits, start=1):
+            subjects_train = _unique_ints(split.groups_train)
+            subjects_test = _unique_ints(split.groups_test)
+            log.info(
+                "fold %d/%d fit n_train=%d n_test=%d subjects_test=%s",
+                fold_i,
+                n_folds,
+                split.X_train.shape[0],
+                split.X_test.shape[0],
+                ",".join(str(s) for s in subjects_test),
+            )
             model = _fit_model(split, model_cfg, protocol, seed)
             y_pred = np.asarray(model.predict(split.X_test))
             y_true_parts.append(np.asarray(split.y_test))
             y_pred_parts.append(y_pred)
-            subjects_train = _unique_ints(split.groups_train)
-            subjects_test = _unique_ints(split.groups_test)
             fold_metrics = compute_metrics(split.y_test, y_pred, labels)
+            log.info("fold %d/%d macro_f1=%.4f", fold_i, n_folds, fold_metrics["macro_f1"])
             fold_rows.append(
                 {
                     "subjects_train": subjects_train,
@@ -143,11 +164,10 @@ def run_experiment(config_path: Path) -> Path:
             "n_folds": len(splits),
             "session_hz": sorted({float(s.hz) for s in sessions}),
         }
-        out = output_dir / f"{config_path.stem}.json"
         out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         mlflow.log_artifact(str(out))
         log.info("wrote %s macro_f1=%.4f protocol=%s", out, metrics["macro_f1"], protocol_name)
-        return out
+    return out
 
 
 def load_aligned_sessions(
@@ -389,7 +409,7 @@ def _git_sha(repo: Path) -> str:
         return "unknown"
 
 
-def _jsonable(value: object) -> object:
+def _jsonable(value: object) -> Any:
     if isinstance(value, dict):
         return {str(k): _jsonable(v) for k, v in value.items()}
     if isinstance(value, list):

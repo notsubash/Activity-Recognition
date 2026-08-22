@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from har.eval.plots import write_readme_figures
 from har.train import _repo_root, _tracking_uri, run_experiment
 
 log = logging.getLogger(__name__)
@@ -50,7 +51,15 @@ def summarize_reports(reports_dir: Path) -> Path:
             continue
         runs.append(payload)
         table.append(_table_row(payload, source=path.name))
-    return _write_summary(reports_dir, runs, table)
+    summary = _write_summary(reports_dir, runs, table)
+    write_readme_figures(reports_dir, _figure_dir(reports_dir))
+    return summary
+
+
+def _figure_dir(reports_dir: Path) -> Path:
+    if reports_dir.name == "reports":
+        return reports_dir.parent / "figures"
+    return reports_dir / "figures"
 
 
 def main(argv: list[str] | None = None) -> Path | None:
@@ -81,9 +90,7 @@ def _table_row(payload: Mapping[str, Any], *, source: str) -> dict[str, Any]:
     return row
 
 
-def _write_summary(
-    out_dir: Path, runs: list[dict[str, Any]], table: list[dict[str, Any]]
-) -> Path:
+def _write_summary(out_dir: Path, runs: list[dict[str, Any]], table: list[dict[str, Any]]) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / LADDER_NAME
     out.write_text(json.dumps({"runs": runs, "table": table}, indent=2) + "\n", encoding="utf-8")

@@ -24,6 +24,7 @@ dependencies = [
     "onnxmltools==1.16.0",
     "skl2onnx==1.20.0",
     "mlflow==2.22.5",
+    "matplotlib==3.10.3",
 ]
 
 [project.optional-dependencies]

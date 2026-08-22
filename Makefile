@@ -5,7 +5,7 @@ PROCESSED_DIR ?= data/processed
 HOST ?= 0.0.0.0
 PORT ?= 8000
 
-.PHONY: install test audit prepare train eval serve
+.PHONY: install test audit prepare train eval figures serve
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -24,6 +24,9 @@ train:
 
 eval:
 	$(PYTHON) -m har.evaluate --from-reports docs/reports
+
+figures:
+	$(PYTHON) -m har.eval.plots --from-reports docs/reports --out docs/figures --sync-mlflow
 
 serve:
 	$(PYTHON) -m uvicorn har.serve.app:app --host $(HOST) --port $(PORT)

@@ -106,8 +106,10 @@ def test_run_experiment_logs_macro_f1_protocol_and_subjects(tmp_path: Path) -> N
     assert run.data.params["subjects_test"]
 
 
-def test_phone_xgb_config_is_protocol_a1_clone() -> None:
-    cfg = yaml.safe_load((REPO / "configs" / "phone_xgb.yaml").read_text(encoding="utf-8"))
+def test_protocol_a1_config_is_student_clone() -> None:
+    cfg = yaml.safe_load(
+        (REPO / "configs" / "protocol_a1_phone_raw_flat_xgb.yaml").read_text(encoding="utf-8")
+    )
     assert cfg["split"]["protocol"] == "leaky"
     assert cfg["window"]["length_samples"] == 80
     assert cfg["window"]["hop_samples"] == 40
@@ -120,8 +122,10 @@ def test_phone_xgb_config_is_protocol_a1_clone() -> None:
     assert params["device"] == "cuda"
 
 
-def test_protocol_a_leaky_config_is_a2_session_safe() -> None:
-    cfg = yaml.safe_load((REPO / "configs" / "protocol_a_leaky.yaml").read_text(encoding="utf-8"))
+def test_protocol_a2_config_is_session_safe_leaky() -> None:
+    cfg = yaml.safe_load(
+        (REPO / "configs" / "protocol_a2_phone_raw_flat_xgb.yaml").read_text(encoding="utf-8")
+    )
     assert cfg["split"]["protocol"] == "leaky"
     assert cfg["window"]["length_s"] == 5.0
     assert cfg["window"]["hop_s"] == 1.0
@@ -300,20 +304,55 @@ def test_grouped_holdout_has_no_subject_overlap_and_n_repeats_folds(tmp_path: Pa
     assert payload["macro_f1"] == pytest.approx(payload["mean_fold_macro_f1"])
 
 
+TRAIN_LADDER = (
+    "protocol_a1_phone_raw_flat_xgb.yaml",
+    "protocol_a2_phone_raw_flat_xgb.yaml",
+    "protocol_b_phone_raw_flat_xgb.yaml",
+    "protocol_b_phone_stat_dummy.yaml",
+    "protocol_b_phone_stat_logreg.yaml",
+    "protocol_b_phone_stat_rf.yaml",
+    "protocol_b_phone_stat_xgb.yaml",
+    "protocol_b_watch_stat_xgb.yaml",
+    "protocol_b_concat_stat_xgb.yaml",
+    "protocol_c_phone_stat_xgb.yaml",
+)
+
+
+def test_train_ladder_filenames_are_complete() -> None:
+    configs = REPO / "configs"
+    found = tuple(sorted(p.name for p in configs.glob("protocol_*.yaml")))
+    assert found == tuple(sorted(TRAIN_LADDER))
+    for stale in (
+        "phone_xgb.yaml",
+        "watch_xgb.yaml",
+        "fusion_xgb.yaml",
+        "protocol_a_leaky.yaml",
+        "protocol_b_dummy.yaml",
+        "protocol_b_logreg.yaml",
+        "protocol_b_rf.yaml",
+        "protocol_b_groupkfold.yaml",
+        "protocol_b_raw_flat.yaml",
+        "protocol_c_loso.yaml",
+    ):
+        assert not (configs / stale).exists()
+
+
 @pytest.mark.parametrize(
     ("filename", "protocol", "device", "features", "model", "protocol_name"),
     [
-        ("protocol_b_groupkfold.yaml", "groupkfold", "phone", "statistical", "xgboost", "B"),
-        ("protocol_b_raw_flat.yaml", "groupkfold", "phone", "raw_flat", "xgboost", "B"),
-        ("protocol_b_dummy.yaml", "groupkfold", "phone", "statistical", "dummy", "B"),
-        ("protocol_b_logreg.yaml", "groupkfold", "phone", "statistical", "logreg", "B"),
-        ("protocol_b_rf.yaml", "groupkfold", "phone", "statistical", "rf", "B"),
-        ("watch_xgb.yaml", "groupkfold", "watch", "statistical", "xgboost", "B"),
-        ("fusion_xgb.yaml", "groupkfold", "both", "statistical", "xgboost", "B"),
-        ("protocol_c_loso.yaml", "grouped_holdout", "phone", "statistical", "xgboost", "C"),
+        ("protocol_a1_phone_raw_flat_xgb.yaml", "leaky", "phone", "raw_flat", "xgboost", "A1"),
+        ("protocol_a2_phone_raw_flat_xgb.yaml", "leaky", "phone", "raw_flat", "xgboost", "A2"),
+        ("protocol_b_phone_stat_xgb.yaml", "groupkfold", "phone", "statistical", "xgboost", "B"),
+        ("protocol_b_phone_raw_flat_xgb.yaml", "groupkfold", "phone", "raw_flat", "xgboost", "B"),
+        ("protocol_b_phone_stat_dummy.yaml", "groupkfold", "phone", "statistical", "dummy", "B"),
+        ("protocol_b_phone_stat_logreg.yaml", "groupkfold", "phone", "statistical", "logreg", "B"),
+        ("protocol_b_phone_stat_rf.yaml", "groupkfold", "phone", "statistical", "rf", "B"),
+        ("protocol_b_watch_stat_xgb.yaml", "groupkfold", "watch", "statistical", "xgboost", "B"),
+        ("protocol_b_concat_stat_xgb.yaml", "groupkfold", "both", "statistical", "xgboost", "B"),
+        ("protocol_c_phone_stat_xgb.yaml", "grouped_holdout", "phone", "statistical", "xgboost", "C"),
     ],
 )
-def test_honest_yaml_matches_protocol_device_features(
+def test_train_yaml_matches_protocol_device_features(
     filename: str,
     protocol: str,
     device: str,
@@ -332,7 +371,15 @@ def test_honest_yaml_matches_protocol_device_features(
     if protocol == "grouped_holdout":
         assert cfg["split"]["n_test"] == 5
         assert cfg["split"]["n_repeats"] == 3
-    if filename == "protocol_b_raw_flat.yaml":
+    if filename == "protocol_a1_phone_raw_flat_xgb.yaml":
+        assert cfg["window"]["length_samples"] == 80
+        assert cfg["window"]["hop_samples"] == 40
+        params = cfg["model"]["params"]
+        for key, value in STUDENT_XGB_PARAMS.items():
+            assert params[key] == value
+        assert params["device"] == "cuda"
+        return
+    if filename.endswith("_raw_flat_xgb.yaml"):
         assert cfg["window"]["length_s"] == 5.0
         assert cfg["window"]["hop_s"] == 1.0
         params = cfg["model"]["params"]

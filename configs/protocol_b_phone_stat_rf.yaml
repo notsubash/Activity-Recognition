@@ -1,4 +1,4 @@
-# Protocol B, phone, statistical features, random forest (no scaler), GroupKFold 5.
+# protocol_b_phone_stat_rf: Protocol B, phone, statistical, random forest (no scaler), GroupKFold 5.
 seed: 42
 data:
   processed_dir: data/processed

@@ -77,7 +77,7 @@ data/external/wisdm-dataset/raw/phone/accel/data_1600_accel_phone.txt
 python -m har.data.download   # skips if that file already exists; not used in CI
 python -m har.data.audit      # writes gitignored CSVs under data/audit/ and docs/data_card.md
 python -m har.data.repair     # resample/align to 20 Hz; writes gitignored parquet under data/processed/
-python -m har.train --config configs/protocol_a_leaky.yaml  # A2 leaky XGBoost; overnight on full WISDM, not CI
+python -m har.train --config configs/protocol_a2_phone_raw_flat_xgb.yaml  # A2 leaky XGBoost; overnight on full WISDM, not CI
 
 python -m mlflow ui --backend-store-uri mlruns # Run Mlflow
 ```
@@ -118,31 +118,40 @@ See `docs/protocol.md` for A1 (80-sample clone) vs A2 (session-safe leaky) and `
 
 ## Honest results (Task 9)
 
-Primary metric is **macro-F1**. Accuracy is secondary. Every cell names protocol and config. Numbers below are full 51-subject WISDM on repaired 20 Hz parquet. On the same flattened phone windows, leaky A2 is 0.8925 macro-F1 and subject-grouped B is 0.2924.
+Primary metric is **macro-F1**. Accuracy is secondary. Every cell names protocol and config. Numbers below are full 51-subject WISDM on repaired 20 Hz parquet. On the same flattened phone windows, leaky A2 is 0.8925 macro-F1 and subject-grouped B is 0.2924. A1 (80-sample clone) is 0.8490 / 0.8475, next to the student 0.8559 accuracy.
+
+### Protocol A1 vs the student notebook (phone, leaky, 80-sample flatten)
+
+| Protocol | Config | Model | macro-F1 | Accuracy |
+|----------|--------|-------|----------|----------|
+| Student notebook | `docs/reports/evaluation.txt` | xgboost | (not reported) | 0.8559 |
+| A1 leaky | `configs/protocol_a1_phone_raw_flat_xgb.yaml` (`docs/reports/protocol_a1_phone_raw_flat_xgb.json`) | xgboost (student 982 trees) | 0.8490 | 0.8475 |
+
+A1 is the clone. It is not the same window geometry as A2.
 
 ### Protocol A vs B, same representation (phone, 5 s / 1 s, `raw_flat`)
 
 | Protocol | Config | Model | macro-F1 | Accuracy |
 |----------|--------|-------|----------|----------|
-| A2 leaky | `configs/protocol_a_leaky.yaml` (`docs/reports/protocol_a_leaky.json`) | xgboost (student 982 trees) | 0.8925 | 0.8913 |
-| B GroupKFold | `configs/protocol_b_raw_flat.yaml` (`docs/reports/protocol_b_raw_flat.json`) | xgboost (student 982 trees) | 0.2924 | 0.3047 |
+| A2 leaky | `configs/protocol_a2_phone_raw_flat_xgb.yaml` (`docs/reports/protocol_a2_phone_raw_flat_xgb.json`) | xgboost (student 982 trees) | 0.8925 | 0.8913 |
+| B GroupKFold | `configs/protocol_b_phone_raw_flat_xgb.yaml` (`docs/reports/protocol_b_phone_raw_flat_xgb.json`) | xgboost (student 982 trees) | 0.2924 | 0.3047 |
 
 ### Protocol B, statistical features, GroupKFold 5
 
 | Device | Config | Model | macro-F1 | Accuracy |
 |--------|--------|-------|----------|----------|
-| phone | `configs/protocol_b_dummy.yaml` (`docs/reports/protocol_b_dummy.json`) | dummy | 0.0151 | 0.0551 |
-| phone | `configs/protocol_b_logreg.yaml` (`docs/reports/protocol_b_logreg.json`) | logreg | 0.2767 | 0.2799 |
-| phone | `configs/protocol_b_rf.yaml` (`docs/reports/protocol_b_rf.json`) | rf | 0.3131 | 0.3252 |
-| phone | `configs/protocol_b_groupkfold.yaml` (`docs/reports/protocol_b_groupkfold.json`) | xgboost (honest 200 trees) | 0.3272 | 0.3382 |
-| watch | `configs/watch_xgb.yaml` (`docs/reports/watch_xgb.json`) | xgboost (honest 200 trees) | 0.7031 | 0.7013 |
-| both (concat windows, 6 channels; not 12-channel fusion) | `configs/fusion_xgb.yaml` (`docs/reports/fusion_xgb.json`) | xgboost (honest 200 trees) | 0.5236 | 0.5267 |
+| phone | `configs/protocol_b_phone_stat_dummy.yaml` (`docs/reports/protocol_b_phone_stat_dummy.json`) | dummy | 0.0151 | 0.0551 |
+| phone | `configs/protocol_b_phone_stat_logreg.yaml` (`docs/reports/protocol_b_phone_stat_logreg.json`) | logreg | 0.2767 | 0.2799 |
+| phone | `configs/protocol_b_phone_stat_rf.yaml` (`docs/reports/protocol_b_phone_stat_rf.json`) | rf | 0.3131 | 0.3252 |
+| phone | `configs/protocol_b_phone_stat_xgb.yaml` (`docs/reports/protocol_b_phone_stat_xgb.json`) | xgboost (honest 200 trees) | 0.3272 | 0.3382 |
+| watch | `configs/protocol_b_watch_stat_xgb.yaml` (`docs/reports/protocol_b_watch_stat_xgb.json`) | xgboost (honest 200 trees) | 0.7031 | 0.7013 |
+| both (concat windows, 6 channels; not 12-channel fusion) | `configs/protocol_b_concat_stat_xgb.yaml` (`docs/reports/protocol_b_concat_stat_xgb.json`) | xgboost (honest 200 trees) | 0.5236 | 0.5267 |
 
 ### Protocol C (46/5 x 3 repeats from one seed, not 51-fold LOSO)
 
 | Protocol | Config | Model | macro-F1 | Accuracy |
 |----------|--------|-------|----------|----------|
-| C grouped_holdout | `configs/protocol_c_loso.yaml` (`docs/reports/protocol_c_loso.json`) | xgboost (honest 200 trees) | 0.2985 | 0.3140 |
+| C grouped_holdout | `configs/protocol_c_phone_stat_xgb.yaml` (`docs/reports/protocol_c_phone_stat_xgb.json`) | xgboost (honest 200 trees) | 0.2985 | 0.3140 |
 
 Rebuild the compact table:
 

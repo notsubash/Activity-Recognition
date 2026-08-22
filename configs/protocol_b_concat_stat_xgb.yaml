@@ -1,10 +1,10 @@
-# Protocol C, phone, statistical features, honest XGBoost. Filename keeps
-# loso; the split is grouped_holdout 46/5 x 3 seeds because 51-fold LOSO
-# XGBoost is too slow. Nested val is still one train subject, not a 5-subject val.
+# protocol_b_concat_stat_xgb: Protocol B, device both: concat phone and watch windows (still 6 channels
+# per window). Not 12-channel time-aligned fusion. Statistical features,
+# honest XGBoost, GroupKFold 5.
 seed: 42
 data:
   processed_dir: data/processed
-  device: phone
+  device: both
 window:
   length_s: 5.0
   hop_s: 1.0
@@ -22,10 +22,9 @@ model:
     early_stopping_rounds: 10
     device: cuda
 split:
-  protocol: grouped_holdout
-  n_test: 5
-  n_repeats: 3
+  protocol: groupkfold
+  n_splits: 5
 tracking:
   experiment: wisdm-har
-  protocol_name: C
+  protocol_name: B
   output_dir: docs/reports

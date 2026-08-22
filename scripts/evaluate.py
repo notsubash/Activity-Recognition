@@ -1,4 +1,4 @@
-"""CLI wrapper: python scripts/evaluate.py --configs configs/protocol_b_dummy.yaml"""
+"""CLI wrapper: python scripts/evaluate.py --configs configs/protocol_b_phone_stat_dummy.yaml"""
 
 from har.evaluate import main
 

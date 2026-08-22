@@ -1,4 +1,4 @@
-# Protocol B, phone, statistical features, logistic regression (scaler on train
+# protocol_b_phone_stat_logreg: Protocol B, phone, statistical, logistic regression (scaler on train
 # only), GroupKFold 5.
 seed: 42
 data:

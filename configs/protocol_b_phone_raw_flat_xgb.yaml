@@ -1,14 +1,12 @@
-# A1: closest student clone (PhoneXGB2). Flatten 80 samples, hop 40, leaky
-# window split, early stop on the test set. Length is a row count, not seconds.
-# Trains on repaired 20 Hz parquet from data/processed (session-safe windows).
-# Not an unrepaired concat-table clone. Delta vs 0.8559 is not leakage-only.
+# protocol_b_phone_raw_flat_xgb: Protocol B, phone, flattened raw windows (same representation as A2:
+# 5 s / 1 s), student XGBoost params, GroupKFold 5. RQ2: leaky A2 vs honest B.
 seed: 42
 data:
   processed_dir: data/processed
   device: phone
 window:
-  length_samples: 80
-  hop_samples: 40
+  length_s: 5.0
+  hop_s: 1.0
   min_coverage: 0.95
 features:
   kind: raw_flat
@@ -24,9 +22,9 @@ model:
     early_stopping_rounds: 10
     device: cuda
 split:
-  protocol: leaky
-  leaky_test_size: 0.2
+  protocol: groupkfold
+  n_splits: 5
 tracking:
   experiment: wisdm-har
-  protocol_name: A1
+  protocol_name: B
   output_dir: docs/reports

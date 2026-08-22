@@ -1,10 +1,10 @@
-# Protocol B, device both: concat phone and watch windows (still 6 channels
-# per window). Not 12-channel time-aligned fusion. Statistical features,
-# honest XGBoost, GroupKFold 5.
+# protocol_c_phone_stat_xgb: Protocol C, phone, statistical, honest XGBoost.
+# Split is grouped_holdout 46/5 x 3, not 51-fold LOSO. Nested val is still one
+# train subject, not a 5-subject val.
 seed: 42
 data:
   processed_dir: data/processed
-  device: both
+  device: phone
 window:
   length_s: 5.0
   hop_s: 1.0
@@ -22,9 +22,10 @@ model:
     early_stopping_rounds: 10
     device: cuda
 split:
-  protocol: groupkfold
-  n_splits: 5
+  protocol: grouped_holdout
+  n_test: 5
+  n_repeats: 3
 tracking:
   experiment: wisdm-har
-  protocol_name: B
+  protocol_name: C
   output_dir: docs/reports

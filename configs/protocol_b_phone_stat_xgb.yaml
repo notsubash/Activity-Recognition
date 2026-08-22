@@ -1,5 +1,5 @@
-# Protocol B, phone, flattened raw windows (same representation as A2:
-# 5 s / 1 s), student XGBoost params, GroupKFold 5. RQ2: leaky A2 vs honest B.
+# protocol_b_phone_stat_xgb: Protocol B, phone, statistical, honest XGBoost (not 982-tree
+# student params), GroupKFold 5. Concat windows are protocol_b_concat_stat_xgb.yaml.
 seed: 42
 data:
   processed_dir: data/processed
@@ -9,16 +9,15 @@ window:
   hop_s: 1.0
   min_coverage: 0.95
 features:
-  kind: raw_flat
+  kind: statistical
 model:
   name: xgboost
   params:
-    colsample_bytree: 0.9396893641976711
-    gamma: 0
-    learning_rate: 0.10241823755571676
+    n_estimators: 200
     max_depth: 6
-    n_estimators: 982
-    subsample: 0.8545330472743582
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
     early_stopping_rounds: 10
     device: cuda
 split:

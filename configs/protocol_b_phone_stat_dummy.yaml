@@ -1,4 +1,4 @@
-# Protocol B, phone, statistical features, dummy majority baseline, GroupKFold 5.
+# protocol_b_phone_stat_dummy: Protocol B, phone, statistical, dummy majority, GroupKFold 5.
 seed: 42
 data:
   processed_dir: data/processed

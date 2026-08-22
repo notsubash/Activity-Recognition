@@ -44,4 +44,4 @@ The student result is phone-only with no stated product choice. The dump has wat
 
 ## What this rebuild does not claim yet
 
-Task 9 filled the Protocol B/C table in the README from `docs/reports/`. A2 is `docs/reports/protocol_a_leaky.json`. Do not treat A2 vs 0.8559 as a leakage-only delta: the student matrix was unrepaired and concat-windowed. Do not treat statistical GroupKFold XGBoost as the same-representation A vs B gap; that cell is `protocol_b_raw_flat.json`.
+Task 9 filled the Protocol B/C table in the README from `docs/reports/`. A2 is `docs/reports/protocol_a2_phone_raw_flat_xgb.json`. Do not treat A2 vs 0.8559 as a leakage-only delta: the student matrix was unrepaired and concat-windowed. Do not treat statistical GroupKFold XGBoost as the same-representation A vs B gap; that cell is `protocol_b_phone_raw_flat_xgb.json`.

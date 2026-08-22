@@ -1,0 +1,31 @@
+# A2: session-safe windows + leaky split on repaired 20 Hz phone parquet.
+# Same student XGBoost family as A1. Isolates subject/overlap leakage from an
+# honest GroupKFold on the same features (Task 9), not parse bugs. The matrix
+# is already aligned and resampled; full WISDM is an overnight run, not CI.
+seed: 42
+data:
+  processed_dir: data/processed
+  device: phone
+window:
+  length_s: 5.0
+  hop_s: 1.0
+  min_coverage: 0.95
+features:
+  kind: raw_flat
+model:
+  name: xgboost
+  params:
+    colsample_bytree: 0.9396893641976711
+    gamma: 0
+    learning_rate: 0.10241823755571676
+    max_depth: 6
+    n_estimators: 982
+    subsample: 0.8545330472743582
+    early_stopping_rounds: 10
+split:
+  protocol: leaky
+  leaky_test_size: 0.2
+tracking:
+  experiment: wisdm-har
+  protocol_name: A2
+  output_dir: docs/reports

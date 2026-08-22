@@ -241,3 +241,37 @@ PYTHONPATH=src python -c "import numpy as np; from har.features.statistical impo
 python -m pytest tests/test_splits.py tests/test_metrics.py -q
 # 5 passed
 ```
+
+---
+
+## Task 8: Training CLI, tracking, Protocol A reproduction
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The 85.6% phone number came from a leaky split and 982-tree XGBoost on flattened windows. We can now run that setup as Protocol A from a YAML file, log macro-F1 and subject lists to MLflow, and keep the full WISDM job off CI.
+
+**Shipped:**
+- `src/har/models/baselines.py` (`fit_dummy`) and `src/har/models/xgboost.py` (`fit_xgboost`, student params)
+- `src/har/train.py`: `run_experiment(config_path) -> metrics json`
+- `scripts/train.py` and `python -m har.train --config ...`
+- `configs/phone_xgb.yaml` (A1: 80-sample flatten, hop 40, leaky)
+- `configs/protocol_a_leaky.yaml` (A2: session-safe 5 s / 1 s, leaky, same XGBoost family)
+- `docs/protocol.md`, `docs/limitations.md`
+- `tests/test_models.py`, `tests/test_train.py`
+
+**Decision:** Protocol A early-stops on the test set, like `PhoneXGB2.ipynb`. XGBoost 2.1 dropped `early_stopping_rounds` on `fit()`, so we pass `xgboost.callback.EarlyStopping`. Student notebook used `device='cuda'`; we pin `device: cpu`. A1 windows are row counts (`length_samples` / `hop_samples`) converted per session as `samples / hz` so mixed-rate files still yield 80-sample vectors. `run_experiment` overlays `configs/default.yaml`. Dummy is `model.name: dummy`. Full 982-tree WISDM is overnight, not pytest.
+
+**Gotcha:**
+- A1 is the closest clone, not bit-identical accuracy. Timestamp unit, accel/gyro join, CUDA vs CPU, and repaired 20 Hz parquet already change the matrix.
+- A2 is leaky session-safe windows on the **same repaired** matrix. Protocol B on the same flatten is Task 9. It is not an unrepaired parse-bug isolate.
+- Missing `--config` must raise. A silent fall-through would train `default.yaml` (GroupKFold, 982 trees) on `data/processed/`.
+- `fit_xgboost` does not inject student hyperparameters; A1/A2 YAML owns them.
+- MLflow param values are strings; subject lists are comma-separated on leaky runs and `pooled_oof` on multi-fold. Tracking URI is a `file://` path so Windows pytest tmp dirs resolve.
+- Do not run `python -m har.train` in CI against `data/processed/`. Tests write tiny parquet under `tmp_path`.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_models.py tests/test_train.py -q
+python -m har.train --config configs/protocol_a_leaky.yaml
+# writes docs/reports/protocol_a_leaky.json and mlruns/ (overnight on full WISDM)
+```

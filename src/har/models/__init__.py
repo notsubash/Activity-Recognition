@@ -1,1 +1,1 @@
-"""Classical HAR models: dummy, logreg, random forest, XGBoost, hierarchical."""
+"""Classical HAR models: dummy, logreg, random forest, XGBoost, hierarchical, export."""

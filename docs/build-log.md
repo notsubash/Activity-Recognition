@@ -387,3 +387,42 @@ python -c "import tomllib; from pathlib import Path; p=tomllib.loads(Path('pypro
 test ! -e src/har/models/tcn.py && test ! -e configs/phone_tcn.yaml && echo skipped
 # skipped
 ```
+
+---
+
+## Task 12: Export, API, Docker, calibration
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The product surface is a CPU FastAPI that scores one 5 s window. XGBoost trees ship as ONNX; features stay in Python.
+
+**Shipped:**
+- `src/har/models/export.py`: `ModelBundle`, joblib and ONNX (`onnxmltools` + sidecar JSON), `predict_window`, `export_from_config`, `python -m har.models.export`
+- `src/har/serve/schema.py`, `src/har/serve/app.py`: `GET /health`, `GET /labels`, `POST /predict`
+- `serving/Dockerfile`, `serving/README.md`, `.dockerignore`
+- `tests/test_serve.py` (stub 422/happy path, device/hz/channel names, body cap, joblib and ONNX roundtrip, fixture export with YAML `cuda` forced to CPU, `HAR_MODEL_PATH` startup for both artifacts, 100-request p95 bound)
+- `docs/model_card.md` (Task 11 skip paragraph plus serving contract and p95)
+- `httpx==0.28.1` on the dev extra for FastAPI `TestClient`
+- `onnx==1.22.0`, `onnxmltools==1.16.0`, `skl2onnx==1.20.0` on runtime deps (`onnx` 1.22 has a wheel; 1.17 did not)
+
+**Decision:** Prefer ONNX for the served XGBoost head. `onnx==1.17.0` had no wheel and tried a source build; `onnx==1.22.0` is `cp312-abi3` and works on Python 3.13. `onnxmltools.convert_xgboost` matches sklearn `predict_proba` on a fixture. joblib remains for stubs. Abstain is `max(proba) < threshold` with default 0.0 (never abstain). The bundle to train for serving is watch statistical XGBoost (`configs/protocol_b_watch_stat_xgb.yaml`). Export refuses `data.device: both` and `hierarchical`. Export always fits with `device: cpu` even if the YAML says `cuda`. `activity_code` is argmax over the 18-way padded `proba`.
+
+**Gotcha:**
+- `POST /predict` `samples` length is `T=100` at 5 s / 20 Hz, not one row. A one-row JSON body is 422.
+- GroupKFold metrics in the model card are not the export fit. Export refits on all windows (one subject held out only for early stopping).
+- Wrong `T` or `C` is 422; so is `device` or `hz` mismatch. Do not send phone windows to a watch bundle.
+- Module-level `har.serve.app:app` loads `HAR_MODEL_PATH` on startup. An `.onnx` path also needs the sidecar `.json`.
+- joblib pickle must be exported with the same CPython minor as `serving/Dockerfile` (3.13). ONNX does not have that pickle constraint.
+- Bodies over 1 MiB return 413. `samples` is capped at 512 rows.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_serve.py -q
+# 19 passed
+python -c "from pathlib import Path; print(Path('docs/model_card.md').read_text().splitlines()[6][:80])"
+# Trees on repaired session features were enough. Protocol B GroupKFold phone sta
+python -m har.models.export --config configs/protocol_b_watch_stat_xgb.yaml --out models/watch_stat_xgb.onnx
+# writes gitignored onnx + json; then:
+# HAR_MODEL_PATH=models/watch_stat_xgb.onnx uvicorn har.serve.app:app --host 0.0.0.0 --port 8000
+```
+

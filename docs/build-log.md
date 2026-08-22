@@ -214,3 +214,30 @@ python -m pytest tests/test_features.py -q
 PYTHONPATH=src python -c "import numpy as np; from har.features.statistical import extract_statistical, flatten_raw, feature_names; x=np.ones((100,6)); print(extract_statistical(x).shape, flatten_raw(x).shape, len(feature_names(6)))"
 # (104,) (600,) 104
 ```
+
+---
+
+## Task 7: Splits and metrics
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The student 85.6% came from shuffling windows, so the same person can be in train and test. Protocol A is allowed to leak. Protocol B (GroupKFold) and C (LOSO) raise if a subject appears on both sides.
+
+**Shipped:**
+- `src/har/eval/splits.py`: `Split`, `leaky_split`, `group_kfold`, `loso`, `assert_no_subject_overlap`
+- `src/har/eval/metrics.py`: `compute_metrics`
+- `src/har/eval/plots.py`: `confusion_counts`, `save_confusion_matrix` (matplotlib imported inside the save path)
+- `tests/test_splits.py`, `tests/test_metrics.py`
+
+**Decision:** `leaky_split` takes `groups` even though the plan's one-line signature omitted it, because `Split` stores `groups_train` / `groups_test` and that is how the leak test is proved. GroupKFold and LOSO call `assert_no_subject_overlap` on every fold. `per_group_f1` maps class indices through `LABEL_ORDER` then `GROUP_OF` and scores the four-group problem (locomotion, posture, hand, eating). Protocol D hardware transfer waits. Matplotlib stays out of `pyproject.toml` until a test or the train CLI actually saves figures. After review: the group-split fixture is interleaved `[1,2,1,2]` with a unique marker per window so a row-wise `KFold` cannot pass; public eval APIs are typed; out-of-range integer labels raise `ValueError`, not `IndexError`.
+
+**Gotcha:**
+- A 50/50 leaky split on `[1,1,2,2]` can accidentally be subject-clean. Use a 3/1 split (`test_size=0.75`) if you want a guaranteed leak for the unit test.
+- `GroupKFold(shuffle=True)` is required before `random_state` does anything.
+- Integer `y` is an index into `LABEL_ORDER`. Generic toy labels `0,1,2` are walking/jogging/stairs, all locomotion, so `per_group_f1` is not interesting unless you pick classes from different groups.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_splits.py tests/test_metrics.py -q
+# 5 passed
+```

@@ -193,6 +193,8 @@ def test_write_data_card_includes_missing_and_hz_tables(tmp_path: Path):
     assert "| 1609 | B | phone | accel |" in text
     assert "| 20 |" in text
     assert "NaN values in xyz" in text
+    assert "later repair" not in text
+    assert "python -m har.data.repair" in text
 
     for name in ("sessions.csv", "coverage.csv", "missing_cells.csv", "hz_by_session.csv"):
         assert (audit_dir / name).is_file()

@@ -12,16 +12,16 @@ Windows are built inside one `(subject_id, device, activity)` session. Scalers, 
 |----------|--------|-------------|
 | A leaky | `train_test_split` on windows, `random_state=42`, 20% test | Student-style leaky number. Label every figure **leaky**. |
 | A1 | A, plus 80-sample flatten / hop 40 (row count, not seconds) | Closest clone of `notebooks/archive/PhoneXGB2.ipynb`. Config: `configs/protocol_a1_phone_raw_flat_xgb.yaml`. |
-| A2 | A, plus session-safe 5 s / 1 s hop on the same repaired matrix | Leaky vs GroupKFold on one representation (RQ2). Config: `configs/protocol_a2_phone_raw_flat_xgb.yaml`. |
+| A2 | A, plus session-safe 5 s / 1 s hop on the same repaired matrix | Leaky vs GroupKFold on one representation. Config: `configs/protocol_a2_phone_raw_flat_xgb.yaml`. |
 | B | 5-fold GroupKFold on `subject_id` | Main comparison table. Configs: `configs/protocol_b_*.yaml`. |
 | C | Grouped holdout: 5 test subjects, rest train, 3 repeats from one seed (46/5 x 3). Not 51-fold LOSO. | Variance across people. Config: `configs/protocol_c_phone_stat_xgb.yaml`. |
-| D | Train phone, test watch (and reverse) on the same subjects | Hardware transfer. Later. |
+| D | Train phone, test watch (and reverse) on the same subjects | Hardware transfer. Not run. |
 
-Task 10 ablations overlay Protocol B phone statistical XGBoost. Table: `docs/reports/ablations.md`. Window length, 15 s trim, phone-accel reorient, magnitude-only features, and a group-then-expert head. Trim and reorient are applied at train time so `data/processed/` stays the trim-0 / unreoriented tree.
+Ablations overlay Protocol B phone statistical XGBoost. Table: `docs/reports/ablations.md`. Window length, 15 s trim, phone-accel reorient, magnitude-only features, and a group-then-expert head. Trim and reorient are applied at train time so `data/processed/` stays the trim-0 / unreoriented tree.
 
 Known clone deltas vs the archive notebook: timestamp deltas as nanoseconds (not `unit="us"`), accel/gyro interpolated onto a shared grid (not an exact-timestamp join), session-safe windows (not `get_frames` on a concat table), no scaler fit on all rows, and flatten layout `(N, T, C)` C-order rather than `(N, 6, 80)`. YAML files request `device: cuda`; `fit_xgboost` falls back to CPU if CUDA is not visible.
 
-Target after A2 exists: leaky accuracy in the same ballpark as 0.86 is possible but not required. Protocol B on the **same** flattened features should drop. That drop is the finding (RQ2). Config: `configs/protocol_b_phone_raw_flat_xgb.yaml` (student XGBoost params, GroupKFold).
+Leaky accuracy in the same ballpark as 0.86 is possible on A1/A2 but not required. Protocol B on the **same** flattened features should drop. That drop is the finding. Config: `configs/protocol_b_phone_raw_flat_xgb.yaml` (student XGBoost params, GroupKFold).
 
 **Concat** in this repo is phone and watch windows stacked as extra rows. Each window is still 6 channels. `data.device: both` loads both devices. It is not a 12-channel time-aligned phone+watch fusion. Config: `configs/protocol_b_concat_stat_xgb.yaml`.
 
@@ -34,8 +34,8 @@ Filenames are `protocol_{rung}_{device}_{features}_{model}.yaml`. `stat` means `
 | Config | Role | Run on disk |
 |--------|------|-------------|
 | `protocol_a1_phone_raw_flat_xgb.yaml` | Student clone, 80-sample flatten, leaky | yes |
-| `protocol_a2_phone_raw_flat_xgb.yaml` | 5 s flatten, leaky (RQ2 leaky side) | yes |
-| `protocol_b_phone_raw_flat_xgb.yaml` | Same flatten as A2, GroupKFold (RQ2 honest side) | yes |
+| `protocol_a2_phone_raw_flat_xgb.yaml` | 5 s flatten, leaky (leaky side of the same-representation pair) | yes |
+| `protocol_b_phone_raw_flat_xgb.yaml` | Same flatten as A2, GroupKFold (honest side) | yes |
 | `protocol_b_phone_stat_dummy.yaml` | Chance floor | yes |
 | `protocol_b_phone_stat_logreg.yaml` | Linear baseline | yes |
 | `protocol_b_phone_stat_rf.yaml` | Tree baseline | yes |
@@ -48,13 +48,13 @@ Not missing, on purpose:
 
 - No watch A1/A2. The student notebook is phone-only.
 - No watch dummy/logreg/RF. One 18-class chance floor is enough.
-- No watch raw_flat. RQ3 (features vs flatten) is the phone A2 vs B flatten pair plus phone statistical B.
+- No watch raw_flat. Feature vs flatten is the phone A2 vs B flatten pair plus phone statistical B.
 - No Protocol C on watch or concat. C checks that phone holdout tracks phone GroupKFold. Watch GroupKFold already has 5 subject folds.
 - No 12-channel aligned fusion. That is a new pipeline, not a YAML rename.
 
 ## Student hyperparameters (Protocol A, and Protocol B raw_flat only)
 
-From `docs/reports/evaluation.txt`. They are pinned in the A1/A2 YAML files. `fit_xgboost` does not inject them. Do not reuse them as the honest-protocol default without a subject-grouped search.
+From `notebooks/archive/student_evaluation.txt`. They are pinned in the A1/A2 YAML files. `fit_xgboost` does not inject them. Do not reuse them as the honest-protocol default without a subject-grouped search.
 
 ```text
 colsample_bytree: 0.9396893641976711

@@ -1,4 +1,4 @@
-# Protocol B ablations (Task 10)
+# Protocol B ablations
 
 Phone, repaired 20 Hz parquet, GroupKFold 5, statistical features unless noted. Primary metric is **macro-F1**. Control is `configs/protocol_b_phone_stat_xgb.yaml` (`docs/reports/protocol_b_phone_stat_xgb.json`): 5.0 s / 1.0 s hop, XYZ, no reorient, trim 0 s, flat 18-way XGBoost (200 trees).
 
@@ -28,14 +28,14 @@ Per-group F1 (locomotion / posture / hand / eating):
 | Magnitude | 0.8698 | 0.2580 | 0.6103 | 0.4516 |
 | Hierarchical | 0.8964 | 0.3178 | 0.6380 | 0.5855 |
 
-## RQ1 (repair knobs on this 18-class phone split)
+## Repair knobs on this 18-class phone split
 
 Resample-to-20 Hz and accel/gyro align are already in the control parquet. On top of that:
 
 - rWISDM-style phone-accel reorient does not raise Protocol B macro-F1 (0.3230 vs 0.3272). Default `reorient: false` stays. This ablation reorients already-aligned phone accel (`channels[:, :3]`); `prepare.py` would reorient raw accel before interpolating onto the gyro grid.
 - Dropping the first 15 s does not raise macro-F1 (0.3247) and lowers eating group F1. Default `trim_start_s: 0.0` stays.
 
-## RQ5 (two-stage head)
+## Two-stage head
 
 Hierarchical does **not** beat flat 18-way on macro-F1 (0.3271 vs 0.3272). It does raise eating group F1 (0.5855 vs 0.4945) and hand group F1 (0.6380 vs 0.6002), while posture drops (0.3178 vs 0.3709). Eating class F1 moves H +0.047, I +0.027, J +0.062, K -0.031, L +0.029.
 

@@ -1,6 +1,6 @@
 # Build log (blog / video)
 
-Source notes for public writing. Not a second spec. After each plan task, append a section. Commands are copy-pasteable.
+Source notes for public writing. Commands are copy-pasteable.
 
 ---
 
@@ -387,3 +387,123 @@ python -c "import tomllib; from pathlib import Path; p=tomllib.loads(Path('pypro
 test ! -e src/har/models/tcn.py && test ! -e configs/phone_tcn.yaml && echo skipped
 # skipped
 ```
+
+---
+
+## Task 12: Export, API, Docker, calibration
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The product surface is a CPU FastAPI that scores one 5 s window. XGBoost trees ship as ONNX; features stay in Python.
+
+**Shipped:**
+- `src/har/models/export.py`: `ModelBundle`, joblib and ONNX (`onnxmltools` + sidecar JSON), `predict_window`, `export_from_config`, `python -m har.models.export`
+- `src/har/serve/schema.py`, `src/har/serve/app.py`: `GET /health`, `GET /labels`, `POST /predict`
+- `serving/Dockerfile`, `serving/README.md`, `.dockerignore`
+- `tests/test_serve.py` (stub 422/happy path, device/hz/channel names, body cap, joblib and ONNX roundtrip, fixture export with YAML `cuda` forced to CPU, `HAR_MODEL_PATH` startup for both artifacts, 100-request p95 bound)
+- `docs/model_card.md` (Task 11 skip paragraph plus serving contract and p95)
+- `httpx==0.28.1` on the dev extra for FastAPI `TestClient`
+- `onnx==1.22.0`, `onnxmltools==1.16.0`, `skl2onnx==1.20.0` on runtime deps (`onnx` 1.22 has a wheel; 1.17 did not)
+
+**Decision:** Prefer ONNX for the served XGBoost head. `onnx==1.17.0` had no wheel and tried a source build; `onnx==1.22.0` is `cp312-abi3` and works on Python 3.13. `onnxmltools.convert_xgboost` matches sklearn `predict_proba` on a fixture. joblib remains for stubs. Abstain is `max(proba) < threshold` with default 0.0 (never abstain). The bundle to train for serving is watch statistical XGBoost (`configs/protocol_b_watch_stat_xgb.yaml`). Export refuses `data.device: both` and `hierarchical`. Export always fits with `device: cpu` even if the YAML says `cuda`. `activity_code` is argmax over the 18-way padded `proba`.
+
+**Gotcha:**
+- `POST /predict` `samples` length is `T=100` at 5 s / 20 Hz, not one row. A one-row JSON body is 422.
+- GroupKFold metrics in the model card are not the export fit. Export refits on all windows (one subject held out only for early stopping).
+- Wrong `T` or `C` is 422; so is `device` or `hz` mismatch. Do not send phone windows to a watch bundle.
+- Module-level `har.serve.app:app` loads `HAR_MODEL_PATH` on startup. An `.onnx` path also needs the sidecar `.json`.
+- joblib pickle must be exported with the same CPython minor as `serving/Dockerfile` (3.13). ONNX does not have that pickle constraint.
+- Bodies over 1 MiB return 413. `samples` is capped at 512 rows.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_serve.py -q
+# 19 passed
+python -c "from pathlib import Path; print(Path('docs/model_card.md').read_text().splitlines()[6][:80])"
+# Trees on repaired session features were enough. Protocol B GroupKFold phone sta
+python -m har.models.export --config configs/protocol_b_watch_stat_xgb.yaml --out models/watch_stat_xgb.onnx
+# writes gitignored onnx + json; then:
+# HAR_MODEL_PATH=models/watch_stat_xgb.onnx uvicorn har.serve.app:app --host 0.0.0.0 --port 8000
+```
+
+---
+
+## Task 13: CI and Makefile
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** An empty GitHub clone can lint and test without WISDM. Full data stays a local `make audit` / `make prepare` step.
+
+**Shipped:**
+- `.github/workflows/ci.yml`: checkout, Python 3.12, `pip install -e ".[dev]"`, `ruff check src tests`, `pytest -q`
+- `Makefile` targets: `install`, `test`, `audit`, `prepare`, `train`, `eval`, `serve`
+- `tests/fixtures/tiny_wisdm/`: subjects 1600 and 1601, activities A and B, phone accel+gyro, 20 Hz, 3 s per activity
+- `tests/test_tiny_wisdm.py`, `tests/test_ci.py`
+- `.gitattributes` keeps `Makefile` as LF so Windows checkout does not break GNU make
+
+**Decision:** CI does not call `har.data.download` and does not read `data/external/`. Pytest uses committed fixtures and tmp_path trees. `make test` is pytest only; ruff lives in the workflow. `make serve` does not set `HAR_MODEL_PATH`; export it first as in `serving/README.md`. Default `CONFIG` is watch statistical XGBoost.
+
+**Gotcha:** A CRLF `Makefile` on Linux is `missing separator`. Keep it LF. CI Python is 3.12; local and the serve image are 3.13. First GitHub run is the real empty-clone check. `make audit` / `make prepare` still need a local WISDM dump.
+
+**Demo clip:**
+```bash
+python -m ruff check src tests
+# All checks passed!
+python -m pytest tests/test_tiny_wisdm.py tests/test_ci.py tests/test_download.py -q
+# 12 passed
+python -m pytest -q
+# 138 passed
+make -n test
+# python -m pytest -q
+```
+
+---
+
+## Case-study README and metric freeze
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The README now reads as a short paper. Lead with leaky 0.8925 vs grouped 0.2924 on the same phone flatten, then watch 0.7031 as the number to cite.
+
+**Shipped:**
+- `README.md` rewritten around protocol + config cells, audit highlights, method, failure cases, reproduce, API
+- `docs/model_card.md`, `docs/data_card.md`, `docs/protocol.md`, `docs/limitations.md` as standalone cards (no work-tracker labels)
+- `docs/reports/evaluation.txt` moved to `notebooks/archive/student_evaluation.txt`
+- `src/har/data/audit.py` data-card limits name repair as shipped (`python -m har.data.repair`)
+- `docs/reports/ablations.md` title and section headings without work-tracker labels
+
+**Decision:** Public writing cites `configs/*.yaml` and `docs/reports/*.json`. The student 0.8559 accuracy stays in the archive next to the notebooks, not in `docs/reports/`. Concat stays labeled as stacked 6-channel windows. Watch sandwich (L) 0.2816 is the actual hard watch class; phone eating per-class F1 0.07-0.11 is worse than stairs/kicking.
+
+**Gotcha:** `docs/data_card.md` is regenerated by `python -m har.data.audit`. Edit `write_data_card`, not only the markdown, or the next audit overwrites the limits paragraph.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_audit.py tests/test_ci.py -q
+python -c "from pathlib import Path; t=Path('README.md').read_text(); assert '0.8925' in t and '0.2924' in t and '0.7031' in t; print(t.splitlines()[2][:140])"
+```
+
+---
+
+## Install pin and portable serve recipe
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** `make install` and GitHub Actions can resolve. Docker no longer bind-mounts a path from this machine.
+
+**Shipped:**
+- `pyproject.toml` `pyarrow==19.0.1` so it sits under MLflow 2.22.5's `pyarrow<20`
+- `serving/README.md` mounts `$PWD/models:/models`
+- `serving/Dockerfile` comment: inference-only image, not a pin workaround
+- `.github/workflows/ci.yml` Python 3.13 (same as local and the serve image)
+- `data/README.md`: null `zip_sha256` means identity is Weiss row counts in the data card
+- `tests/test_ci.py` locks the pyarrow ceiling and the portable mount
+
+**Decision:** Keep MLflow 2.22.5. Drop pyarrow to 19.0.1 (what this venv already ran). Do not bump MLflow just to keep pyarrow 23.
+
+**Gotcha:** A venv that already has pyarrow 23 will look fine until a clean `pip install -e ".[dev]"`. `pip check` on a mixed venv is not enough.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_ci.py -q
+```
+

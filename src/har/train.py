@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 import subprocess
+import tempfile
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
@@ -15,10 +16,11 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from har.constants import CHANNEL_NAMES, LABEL_ORDER, TARGET_HZ
+from har.constants import CHANNEL_NAMES, CODE_TO_NAME, LABEL_ORDER, TARGET_HZ
 from har.data.repair import reorient_phone_accel, trim_start
 from har.data.windows import make_windows, stack_windows
 from har.eval.metrics import MetricsDict, compute_metrics
+from har.eval.plots import save_confusion_matrix, save_run_summary_figure
 from har.eval.splits import Split, group_kfold, grouped_holdout, leaky_split, loso
 from har.features.statistical import extract_statistical, to_magnitude
 from har.models.baselines import fit_dummy, fit_logreg, fit_rf
@@ -87,6 +89,7 @@ def run_experiment(config_path: Path) -> Path:
 
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(str(tracking.get("experiment") or "wisdm-har"))
+    run_name = str(tracking.get("run_name") or config_path.stem)
 
     y_true_parts: list[np.ndarray] = []
     y_pred_parts: list[np.ndarray] = []
@@ -96,7 +99,7 @@ def run_experiment(config_path: Path) -> Path:
     test_subj_union: set[int] = set()
     labels = list(range(len(LABEL_ORDER)))
 
-    with mlflow.start_run() as run:
+    with mlflow.start_run(run_name=run_name) as run:
         mlflow.log_param("protocol", protocol)
         mlflow.log_param("protocol_name", protocol_name)
         mlflow.log_param("git_sha", _git_sha(repo))
@@ -105,8 +108,9 @@ def run_experiment(config_path: Path) -> Path:
         mlflow.log_param("device", device_label)
         mlflow.log_dict(_jsonable(cfg), "config.json")
         log.info(
-            "mlflow run_id=%s experiment=%s",
+            "mlflow run_id=%s run_name=%s experiment=%s",
             run.info.run_id,
+            run_name,
             tracking.get("experiment") or "wisdm-har",
         )
 
@@ -130,6 +134,8 @@ def run_experiment(config_path: Path) -> Path:
             y_pred_parts.append(y_pred)
             fold_metrics = compute_metrics(split.y_test, y_pred, labels)
             fold_metric_rows.append(fold_metrics)
+            mlflow.log_metric("fold_macro_f1", fold_metrics["macro_f1"], step=fold_i)
+            mlflow.log_metric("fold_accuracy", fold_metrics["accuracy"], step=fold_i)
             log.info("fold %d/%d macro_f1=%.4f", fold_i, n_folds, fold_metrics["macro_f1"])
             fold_rows.append(
                 {
@@ -166,6 +172,8 @@ def run_experiment(config_path: Path) -> Path:
         mlflow.log_metric("balanced_accuracy", metrics["balanced_accuracy"])
         mlflow.log_metric("mean_fold_macro_f1", mean_fold_macro_f1)
         mlflow.log_metric("std_fold_macro_f1", std_fold_macro_f1)
+        for group, value in metrics["per_group_f1"].items():
+            mlflow.log_metric(f"group_f1_{group}", value)
 
         payload = {
             "accuracy": metrics["accuracy"],
@@ -196,6 +204,18 @@ def run_experiment(config_path: Path) -> Path:
         }
         out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         mlflow.log_artifact(str(out))
+        class_names = [CODE_TO_NAME[code] for code in LABEL_ORDER]
+        with tempfile.TemporaryDirectory() as td:
+            fig_dir = Path(td)
+            save_run_summary_figure(fig_dir / "per_class_f1.png", payload)
+            save_confusion_matrix(
+                fig_dir / "confusion.png",
+                y_true,
+                y_pred,
+                labels=labels,
+                class_names=class_names,
+            )
+            mlflow.log_artifacts(str(fig_dir))
         log.info("wrote %s macro_f1=%.4f protocol=%s", out, metrics["macro_f1"], protocol_name)
     return out
 

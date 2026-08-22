@@ -26,11 +26,12 @@ data/audit/*
 # Experiment tracking
 mlruns/
 
-# Local model outputs
+# Local model outputs (repo-root artifacts, not src/har/models/)
 *.pkl
 *.joblib
 *.onnx
 onnx/
+/models/
 
 # Packaging
 *.egg-info/

@@ -1,6 +1,6 @@
 # protocol_a2_phone_raw_flat_xgb: session-safe 5 s windows + leaky split on repaired phone parquet.
 # Same student XGBoost family as A1. Isolates subject/overlap leakage from an
-# honest GroupKFold on the same features (Task 9), not parse bugs. The matrix
+# honest GroupKFold on the same features, not parse bugs. The matrix
 # is already aligned and resampled; full WISDM is an overnight run, not CI.
 seed: 42
 data:

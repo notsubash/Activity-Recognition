@@ -1,6 +1,6 @@
-# Limitations of the archived student pipeline
+# Limitations
 
-This is a description of the 2024 notebook pipeline in `notebooks/archive/`, not of the rebuilt `src/har/` package. Keep these defects in mind when you read `docs/reports/evaluation.txt` (phone accuracy `0.855905403547367`). That number is Protocol A (leaky). It is not a subject-independent HAR result.
+The 2024 notebook pipeline in `notebooks/archive/` reported phone accuracy `0.855905403547367` (`notebooks/archive/student_evaluation.txt`). That number is Protocol A (leaky). It is not a subject-independent HAR result. The defects below are why. The rebuilt `src/har/` package avoids them on Protocols B and C; remaining limits of that work are at the end.
 
 ## Subject leakage
 
@@ -24,7 +24,7 @@ A scaler fit on the full matrix before the split sees test windows. Fit scalers,
 
 ## Weak tree features
 
-XGBoost is given `80 x 6 = 480` raw samples. The official ARFF already had distribution bins, peaks, MFCCs, and axis correlations. Flattened raw windows remain the A1/A2 reproduction. Statistical features are the Protocol B default, compared later (RQ3).
+XGBoost is given `80 x 6 = 480` raw samples. The official ARFF already had distribution bins, peaks, MFCCs, and axis correlations. Flattened raw windows remain the A1/A2 reproduction. Statistical features are the Protocol B default.
 
 ## Exact-timestamp accel/gyro merge
 
@@ -32,16 +32,25 @@ IMU clocks rarely share sample instants. An inner join on the raw timestamp drop
 
 ## Unused deep-learning imports
 
-The phone notebook imports Keras CNN pieces. TensorFlow was in `requirements.txt` and is not a v1 runtime dependency. No CNN ships until a logged table shows XGBoost losing on GroupKFold macro-F1.
+The phone notebook imports Keras CNN pieces. TensorFlow was in `requirements.txt` and is not a runtime dependency. Trees on repaired session features beat dummy, logreg, RF, and flattened raw under GroupKFold, so no CNN ships.
 
 ## Watch data unused
 
-The student result is phone-only with no stated product choice. The dump has watch accel and gyro. Phone vs watch vs fusion is RQ4, under a subject-independent protocol.
+The student result is phone-only with no stated product choice. The dump has watch accel and gyro. Under Protocol B, watch statistical XGBoost is 0.7031 macro-F1 and phone is 0.3272 on the same feature family.
 
 ## Evaluation writeup
 
-`docs/reports/evaluation.txt` is a generic metric walkthrough, not a model card. It does not name the split, the window identity rules, or the timestamp handling. Rebuilt numbers live next to a protocol name in the README and in MLflow.
+`notebooks/archive/student_evaluation.txt` is a generic metric walkthrough, not a model card. It does not name the split, the window identity rules, or the timestamp handling. Frozen numbers live next to a protocol name in the README and in MLflow.
 
-## What this rebuild does not claim yet
+## What the honest numbers do not mean
 
-Task 9 filled the Protocol B/C table in the README from `docs/reports/`. A2 is `docs/reports/protocol_a2_phone_raw_flat_xgb.json`. Do not treat A2 vs 0.8559 as a leakage-only delta: the student matrix was unrepaired and concat-windowed. Do not treat statistical GroupKFold XGBoost as the same-representation A vs B gap; that cell is `protocol_b_phone_raw_flat_xgb.json`.
+A2 is `docs/reports/protocol_a2_phone_raw_flat_xgb.json`. Do not treat A2 vs 0.8559 as a leakage-only delta: the student matrix was unrepaired and concat-windowed. Do not treat statistical GroupKFold XGBoost as the same-representation A vs B gap; that cell is `docs/reports/protocol_b_phone_raw_flat_xgb.json`.
+
+## Remaining limits of this release
+
+- No demographics, so no fairness analysis.
+- Concat (`configs/protocol_b_concat_stat_xgb.yaml`) stacks 6-channel windows from both devices. It is not time-aligned 12-channel fusion.
+- Protocol C is 46/5 x 3, not 51-fold LOSO.
+- Phone eating and sitting stay weak even after repair. Watch sandwich (L) is 0.2816 F1 under Protocol B.
+- The served ONNX bundle is a refit, not a GroupKFold fold. Abstain is uncalibrated (threshold 0.0).
+- Mixed raw sampling rates are repaired to 20 Hz; residual orientation flips inside a session are not fully modeled (`reorient` default off; the ablation did not help 18-class phone GroupKFold).

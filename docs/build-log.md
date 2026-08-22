@@ -362,3 +362,28 @@ python -m har.train --config configs/ablations/hierarchical.yaml
 python -m pytest tests/test_train.py -q -k train_ladder
 ls configs/protocol_*.yaml
 ```
+
+---
+
+## Task 11: Optional DL (skipped; trees won)
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The plan only allows a 1D-CNN/TCN if XGBoost loses on Protocol B macro-F1. It did not, so we did not add PyTorch.
+
+**Shipped:**
+- `docs/model_card.md` with the skip paragraph and cited Protocol B configs
+- No `src/har/models/tcn.py`, no `configs/phone_tcn.yaml`, no `dl` extra in `pyproject.toml`
+
+**Decision:** Treat "XGBoost wins" as the logged classical ladder, not as an absolute 18-class score. Phone statistical XGBoost (0.3272) beat dummy (0.0151), logreg (0.2767), RF (0.3131), and flattened raw (0.2924). Watch statistical XGBoost is 0.7031. Hierarchical is 0.3271. That is enough to skip DL. Task 12 still owns serving, ONNX, and the rest of the model card.
+
+**Gotcha:** A later TCN run is not a success claim unless it uses the same GroupKFold splits and the same windows, with a side-by-side row next to `configs/protocol_b_phone_stat_xgb.yaml`. Do not add torch "just in case."
+
+**Demo clip:**
+```bash
+python -c "import tomllib; from pathlib import Path; p=tomllib.loads(Path('pyproject.toml').read_text()); print('torch' in str(p).lower(), 'tcn' in str(p).lower()); print(Path('docs/model_card.md').read_text().splitlines()[6][:80])"
+# False False
+# Trees on repaired session features were enough. ...
+test ! -e src/har/models/tcn.py && test ! -e configs/phone_tcn.yaml && echo skipped
+# skipped
+```

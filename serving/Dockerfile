@@ -7,8 +7,8 @@ RUN apt-get update \
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-# Full `pip install .` pulls mlflow, which requires pyarrow<20 while the package
-# pins pyarrow==23.0.1. The API only needs these runtime packages.
+# Inference-only image: skip full `pip install .` so we do not pull MLflow,
+# XGBoost, or pyarrow. The API only needs these runtime packages.
 RUN pip install --no-cache-dir \
         "numpy==2.2.6" \
         "fastapi==0.115.14" \

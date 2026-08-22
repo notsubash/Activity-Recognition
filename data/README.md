@@ -19,7 +19,7 @@ data/external/wisdm-dataset/
   arffmagic-master/
 ```
 
-Checksum of the zip is recorded in `configs/audit.yaml` as `data.zip_sha256` (null until the first scripted download).
+Checksum of the zip is recorded in `configs/audit.yaml` as `data.zip_sha256`. It is null for a manual extract; this dump is identified by Weiss row counts in `docs/data_card.md` (15,630,426 total, exact match). Fill `zip_sha256` after a scripted download.
 
 ## Get the files
 

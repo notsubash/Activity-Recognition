@@ -6,7 +6,16 @@ import yaml
 REPO = Path(__file__).resolve().parents[1]
 MAKEFILE = REPO / "Makefile"
 WORKFLOW = REPO / ".github" / "workflows" / "ci.yml"
+PYPROJECT = REPO / "pyproject.toml"
+SERVING_README = REPO / "serving" / "README.md"
 REQUIRED_MAKE_TARGETS = ("install", "test", "audit", "prepare", "train", "eval", "serve")
+
+
+def _dep_pin(name: str) -> str:
+    text = PYPROJECT.read_text(encoding="utf-8")
+    match = re.search(rf'"{re.escape(name)}==([^"]+)"', text)
+    assert match, name
+    return match.group(1)
 
 
 def test_makefile_exposes_pipeline_targets():
@@ -35,3 +44,18 @@ def test_ci_runs_ruff_and_pytest_without_wisdm():
     assert "har.data.download" not in blob
     assert "archive.ics.uci.edu" not in blob
     assert "data/external" not in blob
+    assert 'python-version: "3.13"' in text
+
+
+def test_pyarrow_pin_satisfies_mlflow_2_22():
+    pyarrow = _dep_pin("pyarrow")
+    mlflow = _dep_pin("mlflow")
+    major = int(pyarrow.split(".", 1)[0])
+    assert mlflow.startswith("2.22."), mlflow
+    assert 4 <= major < 20, pyarrow
+
+
+def test_serving_readme_uses_portable_models_mount():
+    text = SERVING_README.read_text(encoding="utf-8")
+    assert "C:/Users/" not in text
+    assert "$PWD/models:/models" in text

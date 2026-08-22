@@ -14,7 +14,7 @@ from xgboost.callback import EarlyStopping
 
 log = logging.getLogger(__name__)
 
-# From docs/reports/evaluation.txt. Protocol A reproduction only.
+# From notebooks/archive/student_evaluation.txt. Protocol A reproduction only.
 STUDENT_XGB_PARAMS: dict[str, Any] = {
     "colsample_bytree": 0.9396893641976711,
     "gamma": 0,

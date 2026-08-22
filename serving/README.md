@@ -70,11 +70,11 @@ Build from the repo root (not from `serving/`):
 ```bash
 docker build -f serving/Dockerfile -t har-api .
 MSYS_NO_PATHCONV=1 docker run --rm -p 8000:8000 \
-  -v "C:/Users/USER/Desktop/Activity-Recognition/models:/models" \
+  -v "$PWD/models:/models" \
   -e HAR_MODEL_PATH=/models/watch_stat_xgb.onnx \
   har-api
 ```
 
 Git Bash rewrites `/models/...` to a Git path unless `MSYS_NO_PATHCONV=1` is set. If local uvicorn is already on 8000, map `-p 8001:8000` instead.
 
-The image is CPU inference only. It does not install MLflow, XGBoost, or pyarrow. Full `pip install .` currently fails to resolve `pyarrow==23.0.1` vs `mlflow 2.22.5` (`pyarrow<20`).
+The image is CPU inference only. It does not install MLflow, XGBoost, or pyarrow. A full `pip install .` is the train/eval env, not this image.

@@ -1,12 +1,16 @@
 # Model card: WISDM HAR
 
-Intended use: CPU API that maps one 5 s, 20 Hz IMU window (phone or watch, 6 channels) to one of 18 WISDM activities. Not a medical or safety device.
+Intended use: a CPU API that maps one 5 s, 20 Hz IMU window (phone or watch, 6 channels) to one of 18 WISDM activities. Not a medical or safety device.
 
-## Optional DL
+## Training data
 
-Trees on repaired session features were enough. Protocol B GroupKFold phone statistical XGBoost macro-F1 is 0.3272 (`configs/protocol_b_phone_stat_xgb.yaml`), which beats dummy 0.0151 (`configs/protocol_b_phone_stat_dummy.yaml`), logreg 0.2767 (`configs/protocol_b_phone_stat_logreg.yaml`), RF 0.3131 (`configs/protocol_b_phone_stat_rf.yaml`), and flattened raw 0.2924 (`configs/protocol_b_phone_raw_flat_xgb.yaml`). Watch statistical XGBoost is 0.7031 (`configs/protocol_b_watch_stat_xgb.yaml`). Hierarchical is 0.3271 (`configs/ablations/hierarchical.yaml`) and does not beat the flat tree. No `src/har/models/tcn.py`, no `configs/phone_tcn.yaml`, no PyTorch extra.
+Repaired WISDM 20 Hz parquet from UCI 507. No demographics, so no fairness slice. Timestamp deltas are treated as nanoseconds; absolute epoch is unused. Coverage holes, mixed sampling rates, and row counts: `docs/data_card.md`. Split rules: `docs/protocol.md`. Notebook defects that inflated the old 0.8559 accuracy: `docs/limitations.md`.
 
-## Served model (Task 12)
+## Why trees
+
+Trees on repaired session features were enough. Protocol B GroupKFold phone statistical XGBoost macro-F1 is 0.3272 (`configs/protocol_b_phone_stat_xgb.yaml`), which beats dummy 0.0151 (`configs/protocol_b_phone_stat_dummy.yaml`), logreg 0.2767 (`configs/protocol_b_phone_stat_logreg.yaml`), RF 0.3131 (`configs/protocol_b_phone_stat_rf.yaml`), and flattened raw 0.2924 (`configs/protocol_b_phone_raw_flat_xgb.yaml`). Watch statistical XGBoost is 0.7031 (`configs/protocol_b_watch_stat_xgb.yaml`). Hierarchical is 0.3271 (`configs/ablations/hierarchical.yaml`) and does not beat the flat tree. There is no TCN, no `configs/phone_tcn.yaml`, and no PyTorch extra.
+
+## Served model
 
 | Field | Value |
 |-------|--------|
@@ -31,11 +35,9 @@ Phone statistical XGBoost is 0.3272 macro-F1 under the same protocol. Concat fus
 
 ## Failure modes
 
-Watch group F1 from `docs/reports/protocol_b_watch_stat_xgb.json`: locomotion 0.9292, posture 0.6606, hand 0.8788, eating 0.8450. Phone eating and posture stay hard (eating group F1 0.4945 on `configs/protocol_b_phone_stat_xgb.yaml`). Stairs, kicking, and the eating cluster are the usual confusions. Hierarchical raises eating group F1 on phone (0.5855) but not 18-way macro-F1.
+Watch group F1 from `docs/reports/protocol_b_watch_stat_xgb.json`: locomotion 0.9292, posture 0.6606, hand 0.8788, eating 0.8450. Sandwich (L) is the weak watch class (per-class F1 0.2816). Stairs 0.7028 and kicking 0.7831.
 
-## Data and limits
-
-Training data is repaired WISDM 20 Hz parquet (UCI 507). No demographics, so no fairness slice. Timestamp deltas are nanoseconds; absolute epoch is unused. Details: `docs/data_card.md`, `docs/protocol.md`, `docs/limitations.md`.
+Phone eating and posture stay hard (eating group F1 0.4945 on `configs/protocol_b_phone_stat_xgb.yaml`; sitting 0.1943; eating per-class F1 0.07-0.11). Stairs 0.6588 and kicking 0.6470 are the weakest locomotion classes on phone. Hierarchical raises eating group F1 on phone (0.5855) but not 18-way macro-F1.
 
 ## How to serve
 

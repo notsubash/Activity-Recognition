@@ -313,6 +313,38 @@ python -m har.evaluate --from-reports docs/reports
 
 ---
 
+## Task 10: Ablations and hierarchy (RQ1, RQ5)
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** Flat 18-way phone XGBoost at 5 s is the honest control. A group-then-expert head does not raise macro-F1, but it does raise eating group F1. Ten-second windows are the only knob that clearly beats the 5 s control.
+
+**Shipped:**
+- `src/har/models/hierarchical.py`: group XGBoost plus four experts fit on the true group; inference routes by predicted group
+- `to_magnitude` in `src/har/features/statistical.py`; `features.kind: magnitude`
+- Train-time `repair.trim_start_s` and `repair.reorient` so ablations do not rebuild parquet
+- `configs/ablations/{window_2s,window_10s,trim_15s,reorient_on,magnitude,hierarchical}.yaml`
+- `docs/reports/ablations.md` plus `docs/reports/ablations/*.json`
+- Tests: `tests/test_hierarchical.py` (routing shapes, M=12 remap), train trim/magnitude/YAML checks
+
+**Decision:** Keep default 5 s, trim 0, reorient off. Hierarchical stays an ablation, not the shipped 18-way head. Experts remap local `0..K-1` because locomotion includes M (label 12); XGBoost sklearn rejects `[0,1,2,12]`. Magnitude is two Euclidean channels (accel, gyro), then the same statistical extractor (32 features, no XYZ trio corr).
+
+**Gotcha:**
+- A one-class-per-group fixture never hits the M=12 XGBoost error. The first full-WISDM hierarchical run failed on fold 1 until the remap existed.
+- The first routing test sliced a class-blocked matrix, so test windows were only eating (and leftover hand). It now splits by class so every expert is hit.
+- Train-time reorient is rWISDM gravity repair on phone accel of already-aligned sessions. It is not a second `prepare.py` into a new processed tree.
+- Ablation JSON lives under `docs/reports/ablations/` so `python -m har.evaluate --from-reports docs/reports` does not mix them into `ladder_summary.json`. The YAML test now asserts that path after merge with `default.yaml`.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_hierarchical.py tests/test_train.py tests/test_features.py -q
+# routing + magnitude + ablation YAML
+python -m har.train --config configs/ablations/hierarchical.yaml
+# writes docs/reports/ablations/hierarchical.json (macro-F1 0.3271, eating group F1 0.5855)
+```
+
+---
+
 ## Config rename: `protocol_{rung}_{device}_{features}_{model}`
 
 **Commit:** pending (you add the commit)

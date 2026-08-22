@@ -50,6 +50,7 @@ GROUP_OF = MappingProxyType(
         "L": "eating",
     }
 )
+GROUP_LABELS = ("locomotion", "posture", "hand", "eating")
 
 CHANNEL_NAMES = ("ax", "ay", "az", "gx", "gy", "gz")
 TARGET_HZ = 20.0

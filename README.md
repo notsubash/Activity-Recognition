@@ -153,7 +153,23 @@ A1 is the clone. It is not the same window geometry as A2.
 |----------|--------|-------|----------|----------|
 | C grouped_holdout | `configs/protocol_c_phone_stat_xgb.yaml` (`docs/reports/protocol_c_phone_stat_xgb.json`) | xgboost (honest 200 trees) | 0.2985 | 0.3140 |
 
-Rebuild the compact table:
+### Protocol B ablations (phone statistical XGBoost, Task 10)
+
+Full table and per-group F1: `docs/reports/ablations.md`. Same GroupKFold and 200-tree family as `configs/protocol_b_phone_stat_xgb.yaml`.
+
+| Setting | Config | macro-F1 | Eating group F1 |
+|---------|--------|----------|-----------------|
+| Control 5 s XYZ | `configs/protocol_b_phone_stat_xgb.yaml` | 0.3272 | 0.4945 |
+| Window 10 s | `configs/ablations/window_10s.yaml` | 0.3422 | 0.5151 |
+| Window 2 s | `configs/ablations/window_2s.yaml` | 0.2951 | 0.4610 |
+| Trim 15 s | `configs/ablations/trim_15s.yaml` | 0.3247 | 0.4712 |
+| Reorient on | `configs/ablations/reorient_on.yaml` | 0.3230 | 0.4830 |
+| Magnitude only | `configs/ablations/magnitude.yaml` | 0.3142 | 0.4516 |
+| Hierarchical | `configs/ablations/hierarchical.yaml` | 0.3271 | 0.5855 |
+
+RQ1: reorient and 15 s trim do not beat the unreoriented, untrimmed control on 18-class phone GroupKFold. RQ5: the two-stage head does not beat flat 18-way on macro-F1; eating group F1 rises from 0.4945 to 0.5855.
+
+Rebuild the compact ladder table:
 
 ```bash
 python -m har.evaluate --from-reports docs/reports

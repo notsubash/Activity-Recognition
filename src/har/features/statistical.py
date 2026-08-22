@@ -23,6 +23,22 @@ def feature_names(n_channels: int) -> tuple[str, ...]:
     return tuple(names)
 
 
+def to_magnitude(x: np.ndarray) -> np.ndarray:
+    """XYZ trios ``(T, 3k)`` to Euclidean magnitudes ``(T, k)``."""
+    arr = np.asarray(x, dtype=np.float64)
+    if arr.ndim != 2:
+        raise ValueError("x must be (T, C)")
+    n_ch = int(arr.shape[1])
+    if n_ch == 0 or n_ch % 3 != 0:
+        raise ValueError("x channels must be groups of 3 (XYZ trios)")
+    n_trios = n_ch // 3
+    mags = np.empty((arr.shape[0], n_trios), dtype=np.float64)
+    for i in range(n_trios):
+        trio = arr[:, i * 3 : (i + 1) * 3]
+        mags[:, i] = np.sqrt(np.sum(np.square(trio), axis=1))
+    return mags
+
+
 def flatten_raw(x: np.ndarray) -> np.ndarray:
     """Row-major ``(T, C)`` to ``(T * C,)``."""
     arr = np.asarray(x, dtype=np.float32)

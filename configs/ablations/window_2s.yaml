@@ -1,0 +1,28 @@
+# Ablation: 2 s windows vs default 5 s. Protocol B, phone, statistical XGBoost (RQ window length).
+seed: 42
+data:
+  processed_dir: data/processed
+  device: phone
+window:
+  length_s: 2.0
+  hop_s: 1.0
+  min_coverage: 0.95
+features:
+  kind: statistical
+model:
+  name: xgboost
+  params:
+    n_estimators: 200
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    early_stopping_rounds: 10
+    device: cuda
+split:
+  protocol: groupkfold
+  n_splits: 5
+tracking:
+  experiment: wisdm-har
+  protocol_name: B
+  output_dir: docs/reports/ablations

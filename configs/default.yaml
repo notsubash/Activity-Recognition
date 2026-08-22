@@ -13,7 +13,7 @@ window:
   hop_s: 1.0
   min_coverage: 0.95
 features:
-  kind: statistical   # statistical | raw_flat | both
+  kind: statistical   # statistical | raw_flat | magnitude
 model:
   name: xgboost
 split:

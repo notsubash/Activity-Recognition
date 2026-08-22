@@ -8,7 +8,8 @@ import yaml
 
 from har.constants import CHANNEL_NAMES, TARGET_HZ
 from har.models.xgboost import STUDENT_XGB_PARAMS
-from har.train import run_experiment
+from har.train import _load_config, _reorient_aligned, run_experiment
+from har.types import AlignedSession
 
 NS_PER_S = 1_000_000_000
 REPO = Path(__file__).resolve().parents[1]
@@ -21,9 +22,10 @@ def _write_session(
     *,
     ax: float,
     device: str = "phone",
+    duration_s: float = 6.0,
 ) -> None:
     hz = TARGET_HZ
-    n = int(round(6.0 * hz))
+    n = int(round(duration_s * hz))
     dt_ns = int(round(NS_PER_S / hz))
     data: dict[str, np.ndarray] = {
         "timestamps_ns": np.arange(n, dtype=np.int64) * dt_ns,
@@ -50,15 +52,12 @@ def _write_config(
     features: str = "raw_flat",
     model_params: dict | None = None,
     filename: str = "exp.yaml",
+    repair: dict | None = None,
 ) -> Path:
     model: dict = {"name": model_name}
-    if model_name == "xgboost":
-        model["params"] = model_params or {
-            "n_estimators": 2,
-            "max_depth": 2,
-            "n_jobs": 1,
-            "device": "cpu",
-        }
+    tiny = {"n_estimators": 2, "max_depth": 2, "n_jobs": 1, "device": "cpu"}
+    if model_name in ("xgboost", "hierarchical"):
+        model["params"] = model_params or tiny
     elif model_params:
         model["params"] = model_params
     cfg = {
@@ -75,6 +74,8 @@ def _write_config(
             "protocol_name": protocol_name,
         },
     }
+    if repair:
+        cfg["repair"] = repair
     path = tmp / filename
     path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
     return path
@@ -391,3 +392,144 @@ def test_train_yaml_matches_protocol_device_features(
         assert 100 <= params["n_estimators"] <= 200
         assert params["max_depth"] == 6
         assert params["device"] == "cuda"
+
+
+def test_hierarchical_run_experiment_logs_model(tmp_path: Path) -> None:
+    processed = tmp_path / "processed"
+    axes = {"A": 1.0, "D": 2.0, "F": -1.0, "H": -2.0}
+    for subject_id in (1600, 1601):
+        for activity, ax in axes.items():
+            _write_session(processed, subject_id, activity, ax=ax)
+
+    config = _write_config(
+        tmp_path,
+        processed,
+        "hierarchical",
+        features="statistical",
+        protocol_name="B",
+        split={"protocol": "leaky", "leaky_test_size": 0.25},
+    )
+    payload = json.loads(run_experiment(config).read_text(encoding="utf-8"))
+    assert payload["model"] == "hierarchical"
+    assert payload["n_windows"] > 0
+    assert isinstance(payload["macro_f1"], float)
+
+
+def test_magnitude_features_are_32_from_two_mags(tmp_path: Path) -> None:
+    processed = tmp_path / "processed"
+    for subject_id in (1600, 1601):
+        _write_session(processed, subject_id, "A", ax=1.0)
+        _write_session(processed, subject_id, "B", ax=-1.0)
+
+    config = _write_config(
+        tmp_path,
+        processed,
+        "dummy",
+        features="magnitude",
+        protocol_name="B",
+    )
+    payload = json.loads(run_experiment(config).read_text(encoding="utf-8"))
+    assert payload["features"] == "magnitude"
+    assert payload["n_channels"] == 6
+    assert payload["n_features"] == 32
+
+
+def test_trim_start_reduces_windows(tmp_path: Path) -> None:
+    processed = tmp_path / "processed"
+    for subject_id in (1600, 1601):
+        _write_session(processed, subject_id, "A", ax=1.0, duration_s=20.0)
+        _write_session(processed, subject_id, "B", ax=-1.0, duration_s=20.0)
+
+    window = {"length_s": 5.0, "hop_s": 1.0, "min_coverage": 0.0}
+    full = json.loads(
+        run_experiment(
+            _write_config(
+                tmp_path,
+                processed,
+                "dummy",
+                window=window,
+                filename="full.yaml",
+                protocol_name="B",
+            )
+        ).read_text(encoding="utf-8")
+    )
+    trimmed = json.loads(
+        run_experiment(
+            _write_config(
+                tmp_path,
+                processed,
+                "dummy",
+                window=window,
+                filename="trim.yaml",
+                protocol_name="B",
+                repair={"trim_start_s": 15.0},
+            )
+        ).read_text(encoding="utf-8")
+    )
+    assert trimmed["n_windows"] < full["n_windows"]
+    assert trimmed["n_windows"] > 0
+
+
+def test_reorient_aligned_swaps_phone_accel_leaves_gyro() -> None:
+    n = 8
+    channels = np.zeros((n, 6), dtype=np.float32)
+    channels[:, 0] = 9.8
+    channels[:, 3] = 1.0
+    channels[:, 4] = 2.0
+    channels[:, 5] = 3.0
+    session = AlignedSession(
+        subject_id=1600,
+        activity="A",
+        device="phone",
+        timestamps_ns=np.arange(n, dtype=np.int64),
+        channels=channels,
+        hz=TARGET_HZ,
+    )
+    out = _reorient_aligned(session)
+    np.testing.assert_allclose(out.channels[:, 1], 9.8)
+    np.testing.assert_allclose(out.channels[:, 0], 0.0)
+    np.testing.assert_allclose(out.channels[:, 3:], channels[:, 3:])
+    watch = AlignedSession(
+        subject_id=1600,
+        activity="A",
+        device="watch",
+        timestamps_ns=session.timestamps_ns,
+        channels=channels.copy(),
+        hz=TARGET_HZ,
+    )
+    np.testing.assert_array_equal(_reorient_aligned(watch).channels, channels)
+
+
+ABLATION_FILES = (
+    "window_2s.yaml",
+    "window_10s.yaml",
+    "trim_15s.yaml",
+    "reorient_on.yaml",
+    "magnitude.yaml",
+    "hierarchical.yaml",
+)
+
+
+def test_ablation_yaml_files_match_research_knobs() -> None:
+    root = REPO / "configs" / "ablations"
+    found = tuple(sorted(p.name for p in root.glob("*.yaml")))
+    assert found == tuple(sorted(ABLATION_FILES))
+    merged = {name: _load_config(root / name, REPO) for name in ABLATION_FILES}
+    for name, cfg in merged.items():
+        assert cfg["split"]["protocol"] == "groupkfold"
+        assert cfg["data"]["device"] == "phone"
+        assert cfg["tracking"]["protocol_name"] == "B"
+        assert cfg["tracking"]["output_dir"] == "docs/reports/ablations"
+        assert cfg["window"]["hop_s"] == 1.0
+        assert cfg["model"]["params"]["n_estimators"] == 200
+    assert merged["window_2s.yaml"]["window"]["length_s"] == 2.0
+    assert merged["window_10s.yaml"]["window"]["length_s"] == 10.0
+    assert merged["trim_15s.yaml"]["repair"]["trim_start_s"] == 15.0
+    assert merged["trim_15s.yaml"]["repair"]["reorient"] is False
+    assert merged["reorient_on.yaml"]["repair"]["reorient"] is True
+    assert merged["reorient_on.yaml"]["repair"]["trim_start_s"] == 0.0
+    assert merged["magnitude.yaml"]["features"]["kind"] == "magnitude"
+    assert merged["hierarchical.yaml"]["model"]["name"] == "hierarchical"
+    assert merged["hierarchical.yaml"]["features"]["kind"] == "statistical"
+    for name in ("trim_15s.yaml", "reorient_on.yaml", "magnitude.yaml", "hierarchical.yaml"):
+        assert merged[name]["window"]["length_s"] == 5.0

@@ -16,13 +16,15 @@ import pandas as pd
 import yaml
 
 from har.constants import CHANNEL_NAMES, LABEL_ORDER, TARGET_HZ
+from har.data.repair import reorient_phone_accel, trim_start
 from har.data.windows import make_windows, stack_windows
 from har.eval.metrics import MetricsDict, compute_metrics
 from har.eval.splits import Split, group_kfold, grouped_holdout, leaky_split, loso
-from har.features.statistical import extract_statistical
+from har.features.statistical import extract_statistical, to_magnitude
 from har.models.baselines import fit_dummy, fit_logreg, fit_rf
+from har.models.hierarchical import fit_hierarchical
 from har.models.xgboost import fit_xgboost
-from har.types import AlignedSession, Device
+from har.types import AlignedSession, Device, SessionFrame, SessionKey
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +44,7 @@ def run_experiment(config_path: Path) -> Path:
     )
     if not sessions:
         raise FileNotFoundError(f"no aligned sessions under {processed_dir}")
+    sessions = _apply_session_repair(sessions, _section(cfg, "repair"))
     log.info("loaded %d sessions from %s", len(sessions), processed_dir)
 
     window_cfg = _section(cfg, "window")
@@ -279,6 +282,8 @@ def _featurize(X: np.ndarray, kind: str) -> np.ndarray:
         return np.ascontiguousarray(X).reshape(X.shape[0], -1)
     if kind == "statistical":
         return np.stack([extract_statistical(X[i]) for i in range(X.shape[0])])
+    if kind == "magnitude":
+        return np.stack([extract_statistical(to_magnitude(X[i])) for i in range(X.shape[0])])
     raise ValueError(f"unknown features.kind {kind!r}")
 
 
@@ -338,6 +343,13 @@ def _fit_model(split: Split, model_cfg: Mapping[str, Any], protocol: str, seed: 
         params = dict(model_cfg.get("params") or {})
         params.setdefault("random_state", seed)
         return fit_rf(split.X_train, split.y_train, params)
+    if name == "hierarchical":
+        params = dict(model_cfg.get("params") or {})
+        params.setdefault("random_state", seed)
+        x_train, y_train, x_val, y_val = _train_val(split, protocol, seed)
+        if x_val is not None:
+            params.setdefault("early_stopping_rounds", 10)
+        return fit_hierarchical(x_train, y_train, x_val, y_val, params)
     raise ValueError(f"unknown model {name!r}")
 
 
@@ -360,6 +372,45 @@ def _train_val(
         split.y_train[train_mask],
         split.X_train[val_mask],
         split.y_train[val_mask],
+    )
+
+
+def _apply_session_repair(
+    sessions: list[AlignedSession], repair_cfg: Mapping[str, Any]
+) -> list[AlignedSession]:
+    do_reorient = bool(repair_cfg.get("reorient", False))
+    trim_s = float(repair_cfg.get("trim_start_s") or 0.0)
+    out: list[AlignedSession] = []
+    for session in sessions:
+        if do_reorient:
+            session = _reorient_aligned(session)
+        out.append(trim_start(session, trim_s))
+    return out
+
+
+def _reorient_aligned(session: AlignedSession) -> AlignedSession:
+    if session.device != "phone":
+        return session
+    frame = SessionFrame(
+        key=SessionKey(
+            subject_id=session.subject_id,
+            activity=session.activity,
+            device=session.device,
+            sensor="accel",
+        ),
+        timestamps_ns=session.timestamps_ns,
+        xyz=np.asarray(session.channels[:, :3], dtype=np.float32),
+    )
+    repaired = reorient_phone_accel(frame)
+    channels = np.asarray(session.channels, dtype=np.float32).copy()
+    channels[:, :3] = repaired.xyz
+    return AlignedSession(
+        subject_id=session.subject_id,
+        activity=session.activity,
+        device=session.device,
+        timestamps_ns=session.timestamps_ns,
+        channels=channels,
+        hz=session.hz,
     )
 
 

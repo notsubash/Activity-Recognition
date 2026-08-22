@@ -17,6 +17,8 @@ Windows are built inside one `(subject_id, device, activity)` session. Scalers, 
 | C | Grouped holdout: 5 test subjects, rest train, 3 repeats from one seed (46/5 x 3). Not 51-fold LOSO. | Variance across people. Config: `configs/protocol_c_phone_stat_xgb.yaml`. |
 | D | Train phone, test watch (and reverse) on the same subjects | Hardware transfer. Later. |
 
+Task 10 ablations overlay Protocol B phone statistical XGBoost. Table: `docs/reports/ablations.md`. Window length, 15 s trim, phone-accel reorient, magnitude-only features, and a group-then-expert head. Trim and reorient are applied at train time so `data/processed/` stays the trim-0 / unreoriented tree.
+
 Known clone deltas vs the archive notebook: timestamp deltas as nanoseconds (not `unit="us"`), accel/gyro interpolated onto a shared grid (not an exact-timestamp join), session-safe windows (not `get_frames` on a concat table), no scaler fit on all rows, and flatten layout `(N, T, C)` C-order rather than `(N, 6, 80)`. YAML files request `device: cuda`; `fit_xgboost` falls back to CPU if CUDA is not visible.
 
 Target after A2 exists: leaky accuracy in the same ballpark as 0.86 is possible but not required. Protocol B on the **same** flattened features should drop. That drop is the finding (RQ2). Config: `configs/protocol_b_phone_raw_flat_xgb.yaml` (student XGBoost params, GroupKFold).
@@ -27,7 +29,7 @@ Protocol C keeps `loso()` in code for a true 51-fold run later. The shipped C co
 
 ## Training config names
 
-Filenames are `protocol_{rung}_{device}_{features}_{model}.yaml`. `stat` means `features.kind: statistical`. `concat` means `data.device: both` (stacked 6-channel windows). Metrics JSON uses the same stem under `docs/reports/`.
+Filenames are `protocol_{rung}_{device}_{features}_{model}.yaml`. `stat` means `features.kind: statistical`. `concat` means `data.device: both` (stacked 6-channel windows). Metrics JSON uses the same stem under `docs/reports/`. Ablation configs under `configs/ablations/` write `docs/reports/ablations/<stem>.json` instead.
 
 | Config | Role | Run on disk |
 |--------|------|-------------|
@@ -81,6 +83,13 @@ python -m har.train --config configs/protocol_b_phone_raw_flat_xgb.yaml
 python -m har.train --config configs/protocol_b_watch_stat_xgb.yaml
 python -m har.train --config configs/protocol_b_concat_stat_xgb.yaml
 python -m har.train --config configs/protocol_c_phone_stat_xgb.yaml
+
+python -m har.train --config configs/ablations/window_2s.yaml
+python -m har.train --config configs/ablations/window_10s.yaml
+python -m har.train --config configs/ablations/trim_15s.yaml
+python -m har.train --config configs/ablations/reorient_on.yaml
+python -m har.train --config configs/ablations/magnitude.yaml
+python -m har.train --config configs/ablations/hierarchical.yaml
 
 python -m har.evaluate --configs configs/protocol_b_phone_stat_dummy.yaml configs/protocol_b_phone_stat_logreg.yaml
 python -m har.evaluate --from-reports docs/reports

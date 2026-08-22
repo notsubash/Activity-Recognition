@@ -4,6 +4,7 @@ from har.constants import (
     ACTIVITY_CODES,
     CHANNEL_NAMES,
     CODE_TO_NAME,
+    GROUP_LABELS,
     GROUP_OF,
     LABEL_ORDER,
     TARGET_HZ,
@@ -28,6 +29,8 @@ def test_label_order_matches_activity_codes():
 def test_every_code_has_a_group():
     assert set(GROUP_OF) == set(ACTIVITY_CODES)
     assert set(GROUP_OF.values()) <= KNOWN_GROUPS
+    assert GROUP_LABELS == ("locomotion", "posture", "hand", "eating")
+    assert set(GROUP_LABELS) == set(GROUP_OF.values())
 
 
 def test_code_to_name_has_eighteen_entries():

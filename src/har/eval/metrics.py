@@ -8,9 +8,7 @@ from typing import Any, TypedDict, cast
 import numpy as np
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 
-from har.constants import GROUP_OF, LABEL_ORDER
-
-GROUP_LABELS = ("locomotion", "posture", "hand", "eating")
+from har.constants import GROUP_LABELS, GROUP_OF, LABEL_ORDER
 Label = int | str
 
 

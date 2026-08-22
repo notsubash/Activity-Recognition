@@ -426,3 +426,34 @@ python -m har.models.export --config configs/protocol_b_watch_stat_xgb.yaml --ou
 # HAR_MODEL_PATH=models/watch_stat_xgb.onnx uvicorn har.serve.app:app --host 0.0.0.0 --port 8000
 ```
 
+---
+
+## Task 13: CI and Makefile
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** An empty GitHub clone can lint and test without WISDM. Full data stays a local `make audit` / `make prepare` step.
+
+**Shipped:**
+- `.github/workflows/ci.yml`: checkout, Python 3.12, `pip install -e ".[dev]"`, `ruff check src tests`, `pytest -q`
+- `Makefile` targets: `install`, `test`, `audit`, `prepare`, `train`, `eval`, `serve`
+- `tests/fixtures/tiny_wisdm/`: subjects 1600 and 1601, activities A and B, phone accel+gyro, 20 Hz, 3 s per activity
+- `tests/test_tiny_wisdm.py`, `tests/test_ci.py`
+- `.gitattributes` keeps `Makefile` as LF so Windows checkout does not break GNU make
+
+**Decision:** CI does not call `har.data.download` and does not read `data/external/`. Pytest uses committed fixtures and tmp_path trees. `make test` is pytest only; ruff lives in the workflow. `make serve` does not set `HAR_MODEL_PATH`; export it first as in `serving/README.md`. Default `CONFIG` is watch statistical XGBoost.
+
+**Gotcha:** A CRLF `Makefile` on Linux is `missing separator`. Keep it LF. CI Python is 3.12; local and the serve image are 3.13. First GitHub run is the real empty-clone check. `make audit` / `make prepare` still need a local WISDM dump.
+
+**Demo clip:**
+```bash
+python -m ruff check src tests
+# All checks passed!
+python -m pytest tests/test_tiny_wisdm.py tests/test_ci.py tests/test_download.py -q
+# 12 passed
+python -m pytest -q
+# 138 passed
+make -n test
+# python -m pytest -q
+```
+

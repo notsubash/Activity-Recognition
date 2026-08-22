@@ -214,3 +214,64 @@ python -m pytest tests/test_features.py -q
 PYTHONPATH=src python -c "import numpy as np; from har.features.statistical import extract_statistical, flatten_raw, feature_names; x=np.ones((100,6)); print(extract_statistical(x).shape, flatten_raw(x).shape, len(feature_names(6)))"
 # (104,) (600,) 104
 ```
+
+---
+
+## Task 7: Splits and metrics
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The student 85.6% came from shuffling windows, so the same person can be in train and test. Protocol A is allowed to leak. Protocol B (GroupKFold) and C (LOSO) raise if a subject appears on both sides.
+
+**Shipped:**
+- `src/har/eval/splits.py`: `Split`, `leaky_split`, `group_kfold`, `loso`, `assert_no_subject_overlap`
+- `src/har/eval/metrics.py`: `compute_metrics`
+- `src/har/eval/plots.py`: `confusion_counts`, `save_confusion_matrix` (matplotlib imported inside the save path)
+- `tests/test_splits.py`, `tests/test_metrics.py`
+
+**Decision:** `leaky_split` takes `groups` even though the plan's one-line signature omitted it, because `Split` stores `groups_train` / `groups_test` and that is how the leak test is proved. GroupKFold and LOSO call `assert_no_subject_overlap` on every fold. `per_group_f1` maps class indices through `LABEL_ORDER` then `GROUP_OF` and scores the four-group problem (locomotion, posture, hand, eating). Protocol D hardware transfer waits. Matplotlib stays out of `pyproject.toml` until a test or the train CLI actually saves figures. After review: the group-split fixture is interleaved `[1,2,1,2]` with a unique marker per window so a row-wise `KFold` cannot pass; public eval APIs are typed; out-of-range integer labels raise `ValueError`, not `IndexError`.
+
+**Gotcha:**
+- A 50/50 leaky split on `[1,1,2,2]` can accidentally be subject-clean. Use a 3/1 split (`test_size=0.75`) if you want a guaranteed leak for the unit test.
+- `GroupKFold(shuffle=True)` is required before `random_state` does anything.
+- Integer `y` is an index into `LABEL_ORDER`. Generic toy labels `0,1,2` are walking/jogging/stairs, all locomotion, so `per_group_f1` is not interesting unless you pick classes from different groups.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_splits.py tests/test_metrics.py -q
+# 5 passed
+```
+
+---
+
+## Task 8: Training CLI, tracking, Protocol A reproduction
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The 85.6% phone number came from a leaky split and 982-tree XGBoost on flattened windows. We can now run that setup as Protocol A from a YAML file, log macro-F1 and subject lists to MLflow, and keep the full WISDM job off CI.
+
+**Shipped:**
+- `src/har/models/baselines.py` (`fit_dummy`) and `src/har/models/xgboost.py` (`fit_xgboost`, student params)
+- `src/har/train.py`: `run_experiment(config_path) -> metrics json`
+- `scripts/train.py` and `python -m har.train --config ...`
+- `configs/phone_xgb.yaml` (A1: 80-sample flatten, hop 40, leaky)
+- `configs/protocol_a_leaky.yaml` (A2: session-safe 5 s / 1 s, leaky, same XGBoost family)
+- `docs/protocol.md`, `docs/limitations.md`
+- `tests/test_models.py`, `tests/test_train.py`
+
+**Decision:** Protocol A early-stops on the test set, like `PhoneXGB2.ipynb`. XGBoost 2.1 dropped `early_stopping_rounds` on `fit()`, so we pass `xgboost.callback.EarlyStopping`. Student notebook used `device='cuda'`; we pin `device: cpu`. A1 windows are row counts (`length_samples` / `hop_samples`) converted per session as `samples / hz` so mixed-rate files still yield 80-sample vectors. `run_experiment` overlays `configs/default.yaml`. Dummy is `model.name: dummy`. Full 982-tree WISDM is overnight, not pytest.
+
+**Gotcha:**
+- A1 is the closest clone, not bit-identical accuracy. Timestamp unit, accel/gyro join, CUDA vs CPU, and repaired 20 Hz parquet already change the matrix.
+- A2 is leaky session-safe windows on the **same repaired** matrix. Protocol B on the same flatten is Task 9. It is not an unrepaired parse-bug isolate.
+- Missing `--config` must raise. A silent fall-through would train `default.yaml` (GroupKFold, 982 trees) on `data/processed/`.
+- `fit_xgboost` does not inject student hyperparameters; A1/A2 YAML owns them.
+- MLflow param values are strings; subject lists are comma-separated on leaky runs and `pooled_oof` on multi-fold. Tracking URI is a `file://` path so Windows pytest tmp dirs resolve.
+- Do not run `python -m har.train` in CI against `data/processed/`. Tests write tiny parquet under `tmp_path`.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_models.py tests/test_train.py -q
+python -m har.train --config configs/protocol_a_leaky.yaml
+# writes docs/reports/protocol_a_leaky.json and mlruns/ (overnight on full WISDM)
+```

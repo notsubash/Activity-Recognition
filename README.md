@@ -77,6 +77,7 @@ data/external/wisdm-dataset/raw/phone/accel/data_1600_accel_phone.txt
 python -m har.data.download   # skips if that file already exists; not used in CI
 python -m har.data.audit      # writes gitignored CSVs under data/audit/ and docs/data_card.md
 python -m har.data.repair     # resample/align to 20 Hz; writes gitignored parquet under data/processed/
+python -m har.train --config configs/protocol_a_leaky.yaml  # A2 leaky XGBoost; overnight on full WISDM, not CI
 ```
 
 Zip URL and checksum field live in `configs/audit.yaml`. See `data/README.md`.
@@ -107,9 +108,11 @@ python -m ruff format --check src tests
 
 ## Baseline Result
 
-From `docs/reports/evaluation.txt`:
+From `docs/reports/evaluation.txt` (Protocol A, leaky window split, phone-only):
 - best run accuracy is around `0.8559`
 - class-level metrics highlight weaker classes such as stairs/kicking compared to sitting/writing
+
+See `docs/protocol.md` for A1 (80-sample clone) vs A2 (session-safe leaky) and `docs/limitations.md` for why that number is not subject-independent. MLflow writes `mlruns/` (gitignored). Fixture tests train dummy and a tiny XGBoost; they do not download WISDM.
 
 ## License
 

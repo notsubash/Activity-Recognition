@@ -20,9 +20,9 @@ NS_PER_S = 1_000_000_000
 def test_parse_raw_line_strips_semicolon_and_types():
     subject_id, activity, timestamp, x, y, z = parse_raw_line(OFFICIAL_LINE)
     assert (subject_id, activity, timestamp) == (1600, "A", 252207666810782)
-    assert type(subject_id) is int
-    assert type(timestamp) is int
-    assert type(x) is float and type(y) is float and type(z) is float
+    assert type(subject_id) is int  # noqa: E721
+    assert type(timestamp) is int  # noqa: E721
+    assert type(x) is float and type(y) is float and type(z) is float  # noqa: E721
     assert z == pytest.approx(1.0550842)
     assert not isinstance(z, str)
 

@@ -275,3 +275,38 @@ python -m pytest tests/test_models.py tests/test_train.py -q
 python -m har.train --config configs/protocol_a_leaky.yaml
 # writes docs/reports/protocol_a_leaky.json and mlruns/ (overnight on full WISDM)
 ```
+
+---
+
+## Task 9: Honest baselines (Protocols B and C)
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** Protocol A2 leaked subjects and scored ~0.89 macro-F1 on flattened phone windows. Task 9 adds GroupKFold and a 46/5 x 3 grouped holdout so dummy, logreg, RF, and XGBoost can be compared without the same person in train and test.
+
+**Shipped:**
+- `fit_logreg` (StandardScaler on train only) and `fit_rf` in `src/har/models/baselines.py`
+- `grouped_holdout` in `src/har/eval/splits.py` (5 test subjects, 3 repeats). `loso()` kept.
+- `src/har/evaluate.py`: `run_ladder`, `--from-reports`, `--run-id`; `scripts/evaluate.py`
+- Configs: `protocol_b_dummy/logreg/rf/groupkfold/raw_flat.yaml`, `watch_xgb.yaml`, `fusion_xgb.yaml` (concat 6-channel windows, not 12-channel align), `protocol_c_loso.yaml` (`grouped_holdout`)
+- `notebooks/01_audit_eda.ipynb` loads audit CSVs and reports JSON only
+- README results table; `docs/protocol.md` B/C/fusion/honest-xgb notes
+- Metrics JSON now includes `model`, `device`, `features`
+- Full-WISDM json: dummy/logreg/rf/honest-phone-xgb, `watch_xgb.json` (macro-F1 0.7031), `fusion_xgb.json` (0.5236), `protocol_c_loso.json` (0.2985 mean of 3 repeats; pooled windows were 0.2996), `protocol_b_raw_flat.json` (0.2924 vs A2 leaky 0.8925).
+
+**Decision:** Fusion is concat of phone and watch windows (still 6 channels). Protocol C is not 51-fold LOSO; 51-fold XGBoost is too slow, so C is 46/5 x 3 repeats from one seed. Student 982-tree params stay on A and on `protocol_b_raw_flat.yaml` (RQ2). Other B/C XGBoost YAML uses 200 trees, max_depth 6, cuda. Evaluate loops `run_experiment`; no window cache.
+
+**Gotcha:**
+- Do not present a fixture or 10-subject debug number as the 51-subject result.
+- Logreg scaler belongs in a Pipeline fit on train windows only. RF has no scaler.
+- `python -m har.evaluate --from-reports docs/reports` skips `ladder_summary.json` itself.
+- Do not present a statistical GroupKFold XGBoost number as the A2 vs B leakage gap. A2 leaky `raw_flat` is 0.8925 macro-F1; the same 982-tree flatten under GroupKFold (`protocol_b_raw_flat.json`) is 0.2924. That drop is RQ2. Honest phone B statistical XGBoost is a different representation (0.3272).
+- Watch statistical GroupKFold (0.70 macro-F1) beat phone (0.33) and concat fusion (0.52) on this 18-class split. Concat fusion is more data, not 12-channel alignment.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_models.py tests/test_splits.py tests/test_train.py tests/test_evaluate.py -q
+# 27 passed
+python -m har.train --config configs/protocol_b_dummy.yaml
+python -m har.evaluate --from-reports docs/reports
+```

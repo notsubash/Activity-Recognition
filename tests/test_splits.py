@@ -5,6 +5,7 @@ from har.data.windows import stack_windows
 from har.eval.splits import (
     assert_no_subject_overlap,
     group_kfold,
+    grouped_holdout,
     leaky_split,
     loso,
 )
@@ -76,4 +77,14 @@ def test_loso_holds_out_one_subject_per_fold():
     for split in folds:
         assert_no_subject_overlap(split.groups_train, split.groups_test)
         assert np.unique(split.groups_test).shape == (1,)
+        _assert_split_rows_match_groups(split, X, y, groups)
+
+
+def test_grouped_holdout_no_overlap_and_n_repeats():
+    X, y, groups = _windows([1, 2, 3, 4, 5, 1, 2, 3, 4, 5])
+    folds = list(grouped_holdout(X, y, groups, n_test=2, n_repeats=3, seed=0))
+    assert len(folds) == 3
+    for split in folds:
+        assert_no_subject_overlap(split.groups_train, split.groups_test)
+        assert np.unique(split.groups_test).shape == (2,)
         _assert_split_rows_match_groups(split, X, y, groups)

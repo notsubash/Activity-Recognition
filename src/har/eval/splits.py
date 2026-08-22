@@ -72,6 +72,30 @@ def loso(X: np.ndarray, y: np.ndarray, groups: np.ndarray) -> Iterator[Split]:
         yield split
 
 
+def grouped_holdout(
+    X: np.ndarray,
+    y: np.ndarray,
+    groups: np.ndarray,
+    n_test: int,
+    n_repeats: int,
+    seed: int | None,
+) -> Iterator[Split]:
+    """Protocol C substitute: hold out ``n_test`` subjects, ``n_repeats`` draws."""
+    X, y, groups = _align(X, y, groups)
+    subjects = np.unique(groups)
+    if n_test < 1:
+        raise ValueError("n_test must be >= 1")
+    if n_test >= subjects.size:
+        raise ValueError(f"n_test={n_test} needs more than {int(subjects.size)} subjects")
+    rng = np.random.default_rng(seed)
+    for _ in range(n_repeats):
+        test_subjects = rng.permutation(subjects)[:n_test]
+        test_mask = np.isin(groups, test_subjects)
+        split = _take(X, y, groups, np.flatnonzero(~test_mask), np.flatnonzero(test_mask))
+        assert_no_subject_overlap(split.groups_train, split.groups_test)
+        yield split
+
+
 def _align(
     X: np.ndarray, y: np.ndarray, groups: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

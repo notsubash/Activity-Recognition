@@ -1,1 +1,1 @@
-"""Classical HAR models: dummy baselines and XGBoost."""
+"""Classical HAR models: dummy, logreg, random forest, and XGBoost."""

@@ -17,8 +17,10 @@ features:
 model:
   name: xgboost
 split:
-  protocol: groupkfold  # leaky | groupkfold | loso | hardware_transfer
+  protocol: groupkfold  # leaky | groupkfold | loso | grouped_holdout
   n_splits: 5
+  n_test: 5
+  n_repeats: 3
   leaky_test_size: 0.2
 tracking:
   experiment: wisdm-har

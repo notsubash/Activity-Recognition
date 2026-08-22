@@ -4,7 +4,7 @@ This is a description of the 2024 notebook pipeline in `notebooks/archive/`, not
 
 ## Subject leakage
 
-`Subject-id` is dropped, then `train_test_split` shuffles windows. The same person can appear on both sides of the split. A tree can memorize gait, phone placement, and watch laterality instead of the activity. Protocol B (GroupKFold) and Protocol C (LOSO) exist so this cannot happen by accident.
+`Subject-id` is dropped, then `train_test_split` shuffles windows. The same person can appear on both sides of the split. A tree can memorize gait, phone placement, and watch laterality instead of the activity. Protocol B (GroupKFold) and Protocol C (grouped holdout, not 51-fold LOSO) exist so this cannot happen by accident.
 
 ## Temporal leakage
 
@@ -44,4 +44,4 @@ The student result is phone-only with no stated product choice. The dump has wat
 
 ## What this rebuild does not claim yet
 
-Task 8 ships the training CLI, MLflow logging, and Protocol A configs on repaired parquet. It does not rerun full WISDM in CI, and it does not fill the Protocol B/C table. Until that overnight A2 run exists, do not treat 0.8559 as reproduced. Do not treat A2 vs 0.8559 as a leakage-only delta: the student matrix was unrepaired and concat-windowed.
+Task 9 filled the Protocol B/C table in the README from `docs/reports/`. A2 is `docs/reports/protocol_a_leaky.json`. Do not treat A2 vs 0.8559 as a leakage-only delta: the student matrix was unrepaired and concat-windowed. Do not treat statistical GroupKFold XGBoost as the same-representation A vs B gap; that cell is `protocol_b_raw_flat.json`.

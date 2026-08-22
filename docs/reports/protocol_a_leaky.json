@@ -30,6 +30,9 @@
   },
   "protocol": "leaky",
   "protocol_name": "A2",
+  "model": "xgboost",
+  "device": "phone",
+  "features": "raw_flat",
   "subjects_train": [
     1600,
     1601,
@@ -257,5 +260,8 @@
   "n_folds": 1,
   "session_hz": [
     20.0
-  ]
+  ],
+  "mean_fold_macro_f1": 0.8925072532620201,
+  "std_fold_macro_f1": 0.0,
+  "pooled_macro_f1": 0.8925072532620201
 }

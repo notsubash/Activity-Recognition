@@ -1,0 +1,21 @@
+# Protocol B, phone, statistical features, dummy majority baseline, GroupKFold 5.
+seed: 42
+data:
+  processed_dir: data/processed
+  device: phone
+window:
+  length_s: 5.0
+  hop_s: 1.0
+  min_coverage: 0.95
+features:
+  kind: statistical
+model:
+  name: dummy
+  strategy: most_frequent
+split:
+  protocol: groupkfold
+  n_splits: 5
+tracking:
+  experiment: wisdm-har
+  protocol_name: B
+  output_dir: docs/reports

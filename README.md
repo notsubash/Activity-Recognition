@@ -116,6 +116,40 @@ From `docs/reports/evaluation.txt` (Protocol A, leaky window split, phone-only):
 
 See `docs/protocol.md` for A1 (80-sample clone) vs A2 (session-safe leaky) and `docs/limitations.md` for why that number is not subject-independent. MLflow writes `mlruns/` (gitignored). Fixture tests train dummy and a tiny XGBoost; they do not download WISDM.
 
+## Honest results (Task 9)
+
+Primary metric is **macro-F1**. Accuracy is secondary. Every cell names protocol and config. Numbers below are full 51-subject WISDM on repaired 20 Hz parquet. On the same flattened phone windows, leaky A2 is 0.8925 macro-F1 and subject-grouped B is 0.2924.
+
+### Protocol A vs B, same representation (phone, 5 s / 1 s, `raw_flat`)
+
+| Protocol | Config | Model | macro-F1 | Accuracy |
+|----------|--------|-------|----------|----------|
+| A2 leaky | `configs/protocol_a_leaky.yaml` (`docs/reports/protocol_a_leaky.json`) | xgboost (student 982 trees) | 0.8925 | 0.8913 |
+| B GroupKFold | `configs/protocol_b_raw_flat.yaml` (`docs/reports/protocol_b_raw_flat.json`) | xgboost (student 982 trees) | 0.2924 | 0.3047 |
+
+### Protocol B, statistical features, GroupKFold 5
+
+| Device | Config | Model | macro-F1 | Accuracy |
+|--------|--------|-------|----------|----------|
+| phone | `configs/protocol_b_dummy.yaml` (`docs/reports/protocol_b_dummy.json`) | dummy | 0.0151 | 0.0551 |
+| phone | `configs/protocol_b_logreg.yaml` (`docs/reports/protocol_b_logreg.json`) | logreg | 0.2767 | 0.2799 |
+| phone | `configs/protocol_b_rf.yaml` (`docs/reports/protocol_b_rf.json`) | rf | 0.3131 | 0.3252 |
+| phone | `configs/protocol_b_groupkfold.yaml` (`docs/reports/protocol_b_groupkfold.json`) | xgboost (honest 200 trees) | 0.3272 | 0.3382 |
+| watch | `configs/watch_xgb.yaml` (`docs/reports/watch_xgb.json`) | xgboost (honest 200 trees) | 0.7031 | 0.7013 |
+| both (concat windows, 6 channels; not 12-channel fusion) | `configs/fusion_xgb.yaml` (`docs/reports/fusion_xgb.json`) | xgboost (honest 200 trees) | 0.5236 | 0.5267 |
+
+### Protocol C (46/5 x 3 repeats from one seed, not 51-fold LOSO)
+
+| Protocol | Config | Model | macro-F1 | Accuracy |
+|----------|--------|-------|----------|----------|
+| C grouped_holdout | `configs/protocol_c_loso.yaml` (`docs/reports/protocol_c_loso.json`) | xgboost (honest 200 trees) | 0.2985 | 0.3140 |
+
+Rebuild the compact table:
+
+```bash
+python -m har.evaluate --from-reports docs/reports
+```
+
 ## License
 
 MIT License. See `LICENSE`.

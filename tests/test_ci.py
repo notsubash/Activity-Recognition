@@ -59,3 +59,14 @@ def test_serving_readme_uses_portable_models_mount():
     text = SERVING_README.read_text(encoding="utf-8")
     assert "C:/Users/" not in text
     assert "$PWD/models:/models" in text
+
+
+def test_gitignore_ignores_artifact_dir_not_package_models():
+    lines = [
+        line.strip()
+        for line in (REPO / ".gitignore").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    assert "/models/" in lines
+    assert "models/" not in lines
+    assert (REPO / "src" / "har" / "models" / "export.py").is_file()

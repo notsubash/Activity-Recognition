@@ -24,7 +24,7 @@ def test_dummy_and_xgboost_run_on_fixture_windows():
         y_train,
         X_val,
         y_val,
-        {"n_estimators": 2, "max_depth": 2, "n_jobs": 1},
+        {"n_estimators": 2, "max_depth": 2, "n_jobs": 1, "device": "cpu"},
     )
 
     y_dummy = np.asarray(dummy.predict(X_val), dtype=np.int64)
@@ -34,4 +34,5 @@ def test_dummy_and_xgboost_run_on_fixture_windows():
     assert set(np.unique(y_dummy)).issubset({0, 1})
     assert set(np.unique(y_xgb)).issubset({0, 1})
     assert model.get_params()["n_estimators"] == 2
+    assert model.get_params()["device"] == "cpu"
     assert model.get_params()["subsample"] != STUDENT_XGB_PARAMS["subsample"]

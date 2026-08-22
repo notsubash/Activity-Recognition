@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+import subprocess
 from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
+import xgboost as xgb
 from xgboost import XGBClassifier
 from xgboost.callback import EarlyStopping
+
+log = logging.getLogger(__name__)
 
 # From docs/reports/evaluation.txt. Protocol A reproduction only.
 STUDENT_XGB_PARAMS: dict[str, Any] = {
@@ -41,10 +46,19 @@ def fit_xgboost(
     callbacks = list(cfg.pop("callbacks", None) or [])
     if has_val and early_stopping_rounds:
         callbacks.append(EarlyStopping(rounds=int(early_stopping_rounds)))
+    device = str(cfg.pop("device", _default_device()))
+    tree_method = cfg.pop("tree_method", "hist")
+    log.info(
+        "xgboost device=%s tree_method=%s n_train=%d n_val=%s",
+        device,
+        tree_method,
+        len(np.asarray(X_train)),
+        len(np.asarray(X_val)) if has_val else 0,
+    )
     model = XGBClassifier(
         eval_metric=eval_metric,
-        tree_method=cfg.pop("tree_method", "hist"),
-        device=cfg.pop("device", "cpu"),
+        tree_method=tree_method,
+        device=device,
         random_state=random_state,
         verbosity=cfg.pop("verbosity", 0),
         callbacks=callbacks or None,
@@ -55,3 +69,22 @@ def fit_xgboost(
         fit_kwargs["eval_set"] = [(np.asarray(X_val), np.asarray(y_val))]
     model.fit(np.asarray(X_train), np.asarray(y_train), **fit_kwargs)
     return model
+
+
+def _default_device() -> str:
+    """Use CUDA when the wheel was built with it and a GPU is visible."""
+    try:
+        if not xgb.build_info().get("USE_CUDA"):
+            return "cpu"
+        result = subprocess.run(
+            ["nvidia-smi", "-L"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "cpu"
+    if result.returncode != 0 or not result.stdout.strip():
+        return "cpu"
+    return "cuda"

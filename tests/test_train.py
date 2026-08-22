@@ -47,7 +47,7 @@ def _write_config(
         "features": {"kind": "raw_flat"},
         "model": {
             "name": model_name,
-            "params": {"n_estimators": 2, "max_depth": 2, "n_jobs": 1},
+            "params": {"n_estimators": 2, "max_depth": 2, "n_jobs": 1, "device": "cpu"},
         },
         "split": split or {"protocol": "leaky", "leaky_test_size": 0.25},
         "tracking": {
@@ -99,6 +99,7 @@ def test_phone_xgb_config_is_protocol_a1_clone() -> None:
     for key, value in STUDENT_XGB_PARAMS.items():
         assert params[key] == value
     assert params["early_stopping_rounds"] == 10
+    assert params["device"] == "cuda"
 
 
 def test_protocol_a_leaky_config_is_a2_session_safe() -> None:
@@ -111,6 +112,7 @@ def test_protocol_a_leaky_config_is_a2_session_safe() -> None:
     params = cfg["model"]["params"]
     for key, value in STUDENT_XGB_PARAMS.items():
         assert params[key] == value
+    assert params["device"] == "cuda"
 
 
 def test_missing_config_raises(tmp_path: Path) -> None:

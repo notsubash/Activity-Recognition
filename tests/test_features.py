@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from har.features.statistical import N_BINS, extract_statistical, feature_names, flatten_raw
+from har.features.statistical import N_BINS, extract_statistical, feature_names, flatten_raw, to_magnitude
 
 
 def test_constant_signal_std_is_zero_mean_matches_bins_collapse():
@@ -110,3 +110,15 @@ def test_empty_window_raises():
     empty = np.empty((0, 6))
     with pytest.raises(ValueError, match="at least one sample"):
         extract_statistical(empty)
+
+
+def test_to_magnitude_reduces_xyz_trios() -> None:
+    x = np.zeros((4, 6), dtype=np.float32)
+    x[:, 0] = 3.0
+    x[:, 2] = 4.0
+    x[:, 3] = 6.0
+    x[:, 4] = 8.0
+    mag = to_magnitude(x)
+    assert mag.shape == (4, 2)
+    np.testing.assert_allclose(mag[:, 0], 5.0)
+    np.testing.assert_allclose(mag[:, 1], 10.0)

@@ -1,4 +1,4 @@
-"""CLI wrapper: python scripts/train.py --config configs/protocol_a_leaky.yaml"""
+"""CLI wrapper: python scripts/train.py --config configs/protocol_a2_phone_raw_flat_xgb.yaml"""
 
 from har.train import main
 

@@ -254,8 +254,8 @@ python -m pytest tests/test_splits.py tests/test_metrics.py -q
 - `src/har/models/baselines.py` (`fit_dummy`) and `src/har/models/xgboost.py` (`fit_xgboost`, student params)
 - `src/har/train.py`: `run_experiment(config_path) -> metrics json`
 - `scripts/train.py` and `python -m har.train --config ...`
-- `configs/phone_xgb.yaml` (A1: 80-sample flatten, hop 40, leaky)
-- `configs/protocol_a_leaky.yaml` (A2: session-safe 5 s / 1 s, leaky, same XGBoost family)
+- `configs/protocol_a1_phone_raw_flat_xgb.yaml` (A1: 80-sample flatten, hop 40, leaky)
+- `configs/protocol_a2_phone_raw_flat_xgb.yaml` (A2: session-safe 5 s / 1 s, leaky, same XGBoost family)
 - `docs/protocol.md`, `docs/limitations.md`
 - `tests/test_models.py`, `tests/test_train.py`
 
@@ -272,6 +272,118 @@ python -m pytest tests/test_splits.py tests/test_metrics.py -q
 **Demo clip:**
 ```bash
 python -m pytest tests/test_models.py tests/test_train.py -q
-python -m har.train --config configs/protocol_a_leaky.yaml
-# writes docs/reports/protocol_a_leaky.json and mlruns/ (overnight on full WISDM)
+python -m har.train --config configs/protocol_a2_phone_raw_flat_xgb.yaml
+# writes docs/reports/protocol_a2_phone_raw_flat_xgb.json and mlruns/ (overnight on full WISDM)
+```
+
+---
+
+## Task 9: Honest baselines (Protocols B and C)
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** Protocol A2 leaked subjects and scored ~0.89 macro-F1 on flattened phone windows. Task 9 adds GroupKFold and a 46/5 x 3 grouped holdout so dummy, logreg, RF, and XGBoost can be compared without the same person in train and test.
+
+**Shipped:**
+- `fit_logreg` (StandardScaler on train only) and `fit_rf` in `src/har/models/baselines.py`
+- `grouped_holdout` in `src/har/eval/splits.py` (5 test subjects, 3 repeats). `loso()` kept.
+- `src/har/evaluate.py`: `run_ladder`, `--from-reports`, `--run-id`; `scripts/evaluate.py`
+- Configs: `protocol_b_phone_stat_{dummy,logreg,rf,xgb}.yaml`, `protocol_b_phone_raw_flat_xgb.yaml`, `protocol_b_watch_stat_xgb.yaml`, `protocol_b_concat_stat_xgb.yaml` (concat 6-channel windows, not 12-channel align), `protocol_c_phone_stat_xgb.yaml` (`grouped_holdout`)
+- `notebooks/01_audit_eda.ipynb` loads audit CSVs and reports JSON only
+- README results table; `docs/protocol.md` B/C/fusion/honest-xgb notes
+- Metrics JSON now includes `model`, `device`, `features`
+- Full-WISDM json: dummy/logreg/rf/honest-phone-xgb, `protocol_b_watch_stat_xgb.json` (macro-F1 0.7031), `protocol_b_concat_stat_xgb.json` (0.5236), `protocol_c_phone_stat_xgb.json` (0.2985 mean of 3 repeats; pooled windows were 0.2996), `protocol_b_phone_raw_flat_xgb.json` (0.2924 vs A2 leaky 0.8925).
+
+**Decision:** Concat is phone and watch windows stacked (still 6 channels). Protocol C is not 51-fold LOSO; 51-fold XGBoost is too slow, so C is 46/5 x 3 repeats from one seed. Student 982-tree params stay on A and on `protocol_b_phone_raw_flat_xgb.yaml` (RQ2). Other B/C XGBoost YAML uses 200 trees, max_depth 6, cuda. Evaluate loops `run_experiment`; no window cache.
+
+**Gotcha:**
+- Do not present a fixture or 10-subject debug number as the 51-subject result.
+- Logreg scaler belongs in a Pipeline fit on train windows only. RF has no scaler.
+- `python -m har.evaluate --from-reports docs/reports` skips `ladder_summary.json` itself.
+- Do not present a statistical GroupKFold XGBoost number as the A2 vs B leakage gap. A2 leaky `raw_flat` is 0.8925 macro-F1; the same 982-tree flatten under GroupKFold (`protocol_b_phone_raw_flat_xgb.json`) is 0.2924. That drop is RQ2. Honest phone B statistical XGBoost is a different representation (0.3272).
+- Watch statistical GroupKFold (0.70 macro-F1) beat phone (0.33) and concat fusion (0.52) on this 18-class split. Concat fusion is more data, not 12-channel alignment.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_models.py tests/test_splits.py tests/test_train.py tests/test_evaluate.py -q
+# 27 passed
+python -m har.train --config configs/protocol_b_phone_stat_dummy.yaml
+python -m har.evaluate --from-reports docs/reports
+```
+
+---
+
+## Task 10: Ablations and hierarchy (RQ1, RQ5)
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** Flat 18-way phone XGBoost at 5 s is the honest control. A group-then-expert head does not raise macro-F1, but it does raise eating group F1. Ten-second windows are the only knob that clearly beats the 5 s control.
+
+**Shipped:**
+- `src/har/models/hierarchical.py`: group XGBoost plus four experts fit on the true group; inference routes by predicted group
+- `to_magnitude` in `src/har/features/statistical.py`; `features.kind: magnitude`
+- Train-time `repair.trim_start_s` and `repair.reorient` so ablations do not rebuild parquet
+- `configs/ablations/{window_2s,window_10s,trim_15s,reorient_on,magnitude,hierarchical}.yaml`
+- `docs/reports/ablations.md` plus `docs/reports/ablations/*.json`
+- Tests: `tests/test_hierarchical.py` (routing shapes, M=12 remap), train trim/magnitude/YAML checks
+
+**Decision:** Keep default 5 s, trim 0, reorient off. Hierarchical stays an ablation, not the shipped 18-way head. Experts remap local `0..K-1` because locomotion includes M (label 12); XGBoost sklearn rejects `[0,1,2,12]`. Magnitude is two Euclidean channels (accel, gyro), then the same statistical extractor (32 features, no XYZ trio corr).
+
+**Gotcha:**
+- A one-class-per-group fixture never hits the M=12 XGBoost error. The first full-WISDM hierarchical run failed on fold 1 until the remap existed.
+- The first routing test sliced a class-blocked matrix, so test windows were only eating (and leftover hand). It now splits by class so every expert is hit.
+- Train-time reorient is rWISDM gravity repair on phone accel of already-aligned sessions. It is not a second `prepare.py` into a new processed tree.
+- Ablation JSON lives under `docs/reports/ablations/` so `python -m har.evaluate --from-reports docs/reports` does not mix them into `ladder_summary.json`. The YAML test now asserts that path after merge with `default.yaml`.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_hierarchical.py tests/test_train.py tests/test_features.py -q
+# routing + magnitude + ablation YAML
+python -m har.train --config configs/ablations/hierarchical.yaml
+# writes docs/reports/ablations/hierarchical.json (macro-F1 0.3271, eating group F1 0.5855)
+```
+
+---
+
+## Config rename: `protocol_{rung}_{device}_{features}_{model}`
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** `phone_xgb.yaml` and `watch_xgb.yaml` looked like a device pair. They were not. Phone was the leaky student clone; watch was honest GroupKFold. Names now encode protocol, device, features, and model.
+
+**Shipped:** ten ladder YAML files plus matching `docs/reports/*.json`. README includes A1 (0.8490 / 0.8475). `docs/protocol.md` lists the ladder and the intentional omissions (no watch A1, no watch dummy, no watch Protocol C).
+
+**Decision:** Do not add unrun configs to look complete. Task 9 already had every required cell. `stat` means statistical features. `concat` means `device: both`, not 12-channel fusion. Protocol C filename no longer says `loso`.
+
+**Gotcha:** Retrain writes `docs/reports/<config-stem>.json`. Old stems (`phone_xgb.json`, `watch_xgb.json`, `protocol_c_loso.json`) are gone.
+
+**Demo clip:**
+```bash
+python -m pytest tests/test_train.py -q -k train_ladder
+ls configs/protocol_*.yaml
+```
+
+---
+
+## Task 11: Optional DL (skipped; trees won)
+
+**Commit:** pending (you add the commit)
+
+**Story beat:** The plan only allows a 1D-CNN/TCN if XGBoost loses on Protocol B macro-F1. It did not, so we did not add PyTorch.
+
+**Shipped:**
+- `docs/model_card.md` with the skip paragraph and cited Protocol B configs
+- No `src/har/models/tcn.py`, no `configs/phone_tcn.yaml`, no `dl` extra in `pyproject.toml`
+
+**Decision:** Treat "XGBoost wins" as the logged classical ladder, not as an absolute 18-class score. Phone statistical XGBoost (0.3272) beat dummy (0.0151), logreg (0.2767), RF (0.3131), and flattened raw (0.2924). Watch statistical XGBoost is 0.7031. Hierarchical is 0.3271. That is enough to skip DL. Task 12 still owns serving, ONNX, and the rest of the model card.
+
+**Gotcha:** A later TCN run is not a success claim unless it uses the same GroupKFold splits and the same windows, with a side-by-side row next to `configs/protocol_b_phone_stat_xgb.yaml`. Do not add torch "just in case."
+
+**Demo clip:**
+```bash
+python -c "import tomllib; from pathlib import Path; p=tomllib.loads(Path('pyproject.toml').read_text()); print('torch' in str(p).lower(), 'tcn' in str(p).lower()); print(Path('docs/model_card.md').read_text().splitlines()[6][:80])"
+# False False
+# Trees on repaired session features were enough. ...
+test ! -e src/har/models/tcn.py && test ! -e configs/phone_tcn.yaml && echo skipped
+# skipped
 ```

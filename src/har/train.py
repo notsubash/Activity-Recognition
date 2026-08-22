@@ -16,13 +16,15 @@ import pandas as pd
 import yaml
 
 from har.constants import CHANNEL_NAMES, LABEL_ORDER, TARGET_HZ
+from har.data.repair import reorient_phone_accel, trim_start
 from har.data.windows import make_windows, stack_windows
-from har.eval.metrics import compute_metrics
-from har.eval.splits import Split, group_kfold, leaky_split, loso
-from har.features.statistical import extract_statistical
-from har.models.baselines import fit_dummy
+from har.eval.metrics import MetricsDict, compute_metrics
+from har.eval.splits import Split, group_kfold, grouped_holdout, leaky_split, loso
+from har.features.statistical import extract_statistical, to_magnitude
+from har.models.baselines import fit_dummy, fit_logreg, fit_rf
+from har.models.hierarchical import fit_hierarchical
 from har.models.xgboost import fit_xgboost
-from har.types import AlignedSession, Device
+from har.types import AlignedSession, Device, SessionFrame, SessionKey
 
 log = logging.getLogger(__name__)
 
@@ -34,13 +36,15 @@ def run_experiment(config_path: Path) -> Path:
     cfg = _load_config(config_path, repo)
     data_cfg = _section(cfg, "data")
     processed_dir = _resolve_path(data_cfg.get("processed_dir") or "data/processed", repo)
+    device_cfg = data_cfg.get("device")
     sessions = load_aligned_sessions(
         processed_dir,
-        device=_device_filter(data_cfg.get("device")),
+        device=_device_filter(device_cfg),
         subjects=data_cfg.get("subjects"),
     )
     if not sessions:
         raise FileNotFoundError(f"no aligned sessions under {processed_dir}")
+    sessions = _apply_session_repair(sessions, _section(cfg, "repair"))
     log.info("loaded %d sessions from %s", len(sessions), processed_dir)
 
     window_cfg = _section(cfg, "window")
@@ -76,6 +80,8 @@ def run_experiment(config_path: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     protocol_name = str(tracking.get("protocol_name") or protocol)
     model_cfg = _section(cfg, "model")
+    model_name = str(model_cfg.get("name") or "xgboost")
+    device_label = "both" if device_cfg in (None, "both", "all") else str(device_cfg)
     tracking_uri = _tracking_uri(tracking.get("tracking_uri"), repo)
     out = output_dir / f"{config_path.stem}.json"
 
@@ -84,17 +90,19 @@ def run_experiment(config_path: Path) -> Path:
 
     y_true_parts: list[np.ndarray] = []
     y_pred_parts: list[np.ndarray] = []
-    subjects_train: list[int] = []
-    subjects_test: list[int] = []
     fold_rows: list[dict[str, object]] = []
+    fold_metric_rows: list[MetricsDict] = []
+    train_subj_union: set[int] = set()
+    test_subj_union: set[int] = set()
     labels = list(range(len(LABEL_ORDER)))
 
     with mlflow.start_run() as run:
         mlflow.log_param("protocol", protocol)
         mlflow.log_param("protocol_name", protocol_name)
         mlflow.log_param("git_sha", _git_sha(repo))
-        mlflow.log_param("model", str(model_cfg.get("name") or "xgboost"))
+        mlflow.log_param("model", model_name)
         mlflow.log_param("features", feature_kind)
+        mlflow.log_param("device", device_label)
         mlflow.log_dict(_jsonable(cfg), "config.json")
         log.info(
             "mlflow run_id=%s experiment=%s",
@@ -104,33 +112,47 @@ def run_experiment(config_path: Path) -> Path:
 
         n_folds = len(splits)
         for fold_i, split in enumerate(splits, start=1):
-            subjects_train = _unique_ints(split.groups_train)
-            subjects_test = _unique_ints(split.groups_test)
+            fold_train = _unique_ints(split.groups_train)
+            fold_test = _unique_ints(split.groups_test)
+            train_subj_union.update(fold_train)
+            test_subj_union.update(fold_test)
             log.info(
                 "fold %d/%d fit n_train=%d n_test=%d subjects_test=%s",
                 fold_i,
                 n_folds,
                 split.X_train.shape[0],
                 split.X_test.shape[0],
-                ",".join(str(s) for s in subjects_test),
+                ",".join(str(s) for s in fold_test),
             )
             model = _fit_model(split, model_cfg, protocol, seed)
             y_pred = np.asarray(model.predict(split.X_test))
             y_true_parts.append(np.asarray(split.y_test))
             y_pred_parts.append(y_pred)
             fold_metrics = compute_metrics(split.y_test, y_pred, labels)
+            fold_metric_rows.append(fold_metrics)
             log.info("fold %d/%d macro_f1=%.4f", fold_i, n_folds, fold_metrics["macro_f1"])
             fold_rows.append(
                 {
-                    "subjects_train": subjects_train,
-                    "subjects_test": subjects_test,
+                    "subjects_train": fold_train,
+                    "subjects_test": fold_test,
                     "macro_f1": fold_metrics["macro_f1"],
+                    "accuracy": fold_metrics["accuracy"],
                 }
             )
 
         y_true = np.concatenate(y_true_parts)
         y_pred = np.concatenate(y_pred_parts)
-        metrics = compute_metrics(y_true, y_pred, labels)
+        pooled_metrics = compute_metrics(y_true, y_pred, labels)
+        fold_f1 = [row["macro_f1"] for row in fold_metric_rows]
+        mean_fold_macro_f1 = float(np.mean(fold_f1))
+        std_fold_macro_f1 = float(np.std(fold_f1, ddof=1)) if len(fold_f1) > 1 else 0.0
+        # GroupKFold is a partition, so pooled OOF is valid. grouped_holdout
+        # repeats can re-use test subjects; headline metrics are the fold mean.
+        metrics = (
+            _mean_metrics(fold_metric_rows) if protocol == "grouped_holdout" else pooled_metrics
+        )
+        subjects_train = sorted(train_subj_union)
+        subjects_test = sorted(test_subj_union)
         pooled_oof = len(splits) > 1
         if pooled_oof:
             mlflow.log_param("subjects_train", "pooled_oof")
@@ -142,6 +164,8 @@ def run_experiment(config_path: Path) -> Path:
         mlflow.log_metric("macro_f1", metrics["macro_f1"])
         mlflow.log_metric("accuracy", metrics["accuracy"])
         mlflow.log_metric("balanced_accuracy", metrics["balanced_accuracy"])
+        mlflow.log_metric("mean_fold_macro_f1", mean_fold_macro_f1)
+        mlflow.log_metric("std_fold_macro_f1", std_fold_macro_f1)
 
         payload = {
             "accuracy": metrics["accuracy"],
@@ -149,8 +173,14 @@ def run_experiment(config_path: Path) -> Path:
             "macro_f1": metrics["macro_f1"],
             "per_class_f1": {str(k): v for k, v in metrics["per_class_f1"].items()},
             "per_group_f1": dict(metrics["per_group_f1"]),
+            "mean_fold_macro_f1": mean_fold_macro_f1,
+            "std_fold_macro_f1": std_fold_macro_f1,
+            "pooled_macro_f1": pooled_metrics["macro_f1"],
             "protocol": protocol,
             "protocol_name": protocol_name,
+            "model": model_name,
+            "device": device_label,
+            "features": feature_kind,
             "subjects_train": subjects_train,
             "subjects_test": subjects_test,
             "pooled_oof": pooled_oof,
@@ -252,6 +282,8 @@ def _featurize(X: np.ndarray, kind: str) -> np.ndarray:
         return np.ascontiguousarray(X).reshape(X.shape[0], -1)
     if kind == "statistical":
         return np.stack([extract_statistical(X[i]) for i in range(X.shape[0])])
+    if kind == "magnitude":
+        return np.stack([extract_statistical(to_magnitude(X[i])) for i in range(X.shape[0])])
     raise ValueError(f"unknown features.kind {kind!r}")
 
 
@@ -278,6 +310,16 @@ def _iter_splits(
     if protocol == "loso":
         yield from loso(X, y, groups)
         return
+    if protocol == "grouped_holdout":
+        yield from grouped_holdout(
+            X,
+            y,
+            groups,
+            n_test=int(split_cfg.get("n_test", 5)),
+            n_repeats=int(split_cfg.get("n_repeats", 3)),
+            seed=seed,
+        )
+        return
     raise ValueError(f"unknown protocol {protocol!r}")
 
 
@@ -293,6 +335,21 @@ def _fit_model(split: Split, model_cfg: Mapping[str, Any], protocol: str, seed: 
         if x_val is not None:
             params.setdefault("early_stopping_rounds", 10)
         return fit_xgboost(x_train, y_train, x_val, y_val, params)
+    if name == "logreg":
+        params = dict(model_cfg.get("params") or {})
+        params.setdefault("random_state", seed)
+        return fit_logreg(split.X_train, split.y_train, params)
+    if name == "rf":
+        params = dict(model_cfg.get("params") or {})
+        params.setdefault("random_state", seed)
+        return fit_rf(split.X_train, split.y_train, params)
+    if name == "hierarchical":
+        params = dict(model_cfg.get("params") or {})
+        params.setdefault("random_state", seed)
+        x_train, y_train, x_val, y_val = _train_val(split, protocol, seed)
+        if x_val is not None:
+            params.setdefault("early_stopping_rounds", 10)
+        return fit_hierarchical(x_train, y_train, x_val, y_val, params)
     raise ValueError(f"unknown model {name!r}")
 
 
@@ -318,6 +375,45 @@ def _train_val(
     )
 
 
+def _apply_session_repair(
+    sessions: list[AlignedSession], repair_cfg: Mapping[str, Any]
+) -> list[AlignedSession]:
+    do_reorient = bool(repair_cfg.get("reorient", False))
+    trim_s = float(repair_cfg.get("trim_start_s") or 0.0)
+    out: list[AlignedSession] = []
+    for session in sessions:
+        if do_reorient:
+            session = _reorient_aligned(session)
+        out.append(trim_start(session, trim_s))
+    return out
+
+
+def _reorient_aligned(session: AlignedSession) -> AlignedSession:
+    if session.device != "phone":
+        return session
+    frame = SessionFrame(
+        key=SessionKey(
+            subject_id=session.subject_id,
+            activity=session.activity,
+            device=session.device,
+            sensor="accel",
+        ),
+        timestamps_ns=session.timestamps_ns,
+        xyz=np.asarray(session.channels[:, :3], dtype=np.float32),
+    )
+    repaired = reorient_phone_accel(frame)
+    channels = np.asarray(session.channels, dtype=np.float32).copy()
+    channels[:, :3] = repaired.xyz
+    return AlignedSession(
+        subject_id=session.subject_id,
+        activity=session.activity,
+        device=session.device,
+        timestamps_ns=session.timestamps_ns,
+        channels=channels,
+        hz=session.hz,
+    )
+
+
 def _device_filter(raw: object) -> Device | None:
     if raw in (None, "both", "all"):
         return None
@@ -333,6 +429,25 @@ def _as_device(raw: object) -> Device:
 
 def _unique_ints(values: np.ndarray) -> list[int]:
     return [int(v) for v in np.unique(values).tolist()]
+
+
+def _mean_metrics(rows: list[MetricsDict]) -> MetricsDict:
+    """Unweighted mean of per-fold metrics. Used when folds are not a partition."""
+    if not rows:
+        raise ValueError("no fold metrics to average")
+    class_keys = list(rows[0]["per_class_f1"])
+    group_keys = list(rows[0]["per_group_f1"])
+    return {
+        "accuracy": float(np.mean([row["accuracy"] for row in rows])),
+        "balanced_accuracy": float(np.mean([row["balanced_accuracy"] for row in rows])),
+        "macro_f1": float(np.mean([row["macro_f1"] for row in rows])),
+        "per_class_f1": {
+            key: float(np.mean([row["per_class_f1"][key] for row in rows])) for key in class_keys
+        },
+        "per_group_f1": {
+            key: float(np.mean([row["per_group_f1"][key] for row in rows])) for key in group_keys
+        },
+    }
 
 
 def _section(cfg: Mapping[str, Any], name: str) -> dict[str, Any]:

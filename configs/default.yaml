@@ -13,12 +13,14 @@ window:
   hop_s: 1.0
   min_coverage: 0.95
 features:
-  kind: statistical   # statistical | raw_flat | both
+  kind: statistical   # statistical | raw_flat | magnitude
 model:
   name: xgboost
 split:
-  protocol: groupkfold  # leaky | groupkfold | loso | hardware_transfer
+  protocol: groupkfold  # leaky | groupkfold | loso | grouped_holdout
   n_splits: 5
+  n_test: 5
+  n_repeats: 3
   leaky_test_size: 0.2
 tracking:
   experiment: wisdm-har

@@ -1,0 +1,31 @@
+# protocol_c_phone_stat_xgb: Protocol C, phone, statistical, honest XGBoost.
+# Split is grouped_holdout 46/5 x 3, not 51-fold LOSO. Nested val is still one
+# train subject, not a 5-subject val.
+seed: 42
+data:
+  processed_dir: data/processed
+  device: phone
+window:
+  length_s: 5.0
+  hop_s: 1.0
+  min_coverage: 0.95
+features:
+  kind: statistical
+model:
+  name: xgboost
+  params:
+    n_estimators: 200
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    early_stopping_rounds: 10
+    device: cuda
+split:
+  protocol: grouped_holdout
+  n_test: 5
+  n_repeats: 3
+tracking:
+  experiment: wisdm-har
+  protocol_name: C
+  output_dir: docs/reports
